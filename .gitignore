@@ -1,0 +1,9 @@
+/.gradle
+/.idea
+
+/android/build
+/common/build
+/desktop/build
+
+/*.hprof
+/local.properties
