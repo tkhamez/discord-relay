@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="press_back">Press back button again to exit.</string>
+    <string name="app_name" translatable="false">Discord Relay</string>
+    <string name="connected_discord">Connected to Discord.</string>
+</resources>

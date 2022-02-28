@@ -6,58 +6,56 @@ plugins {
     id("com.android.library")
 }
 
-group = "tkhamez.discordRelay"
-version = "1.0"
-
 kotlin {
-    android()
+    android {
+        compilations.all {
+            kotlinOptions.jvmTarget = "11"
+        }
+    }
     jvm("desktop") {
         compilations.all {
             kotlinOptions.jvmTarget = "11"
         }
     }
     sourceSets {
-        val commonMain by getting {
+        @Suppress("UNUSED_VARIABLE") val commonMain by getting {
             dependencies {
+                implementation(project(":lib"))
                 api(compose.runtime)
                 api(compose.foundation)
                 api(compose.material)
             }
         }
-        val commonTest by getting {
+        @Suppress("UNUSED_VARIABLE") val androidMain by getting {
             dependencies {
-                implementation(kotlin("test"))
+                api("androidx.appcompat:appcompat:1.4.1")
+                api("androidx.core:core-ktx:1.7.0")
+                implementation("androidx.datastore:datastore-preferences:1.0.0")
             }
         }
-        val androidMain by getting {
-            dependencies {
-                api("androidx.appcompat:appcompat:1.2.0")
-                api("androidx.core:core-ktx:1.3.1")
-            }
-        }
-        val androidTest by getting {
-            dependencies {
-                implementation("junit:junit:4.13")
-            }
-        }
-        val desktopMain by getting {
+        @Suppress("UNUSED_VARIABLE") val desktopMain by getting {
             dependencies {
                 api(compose.preview)
             }
         }
-        val desktopTest by getting
+
+        // Workaround for "The Kotlin source set androidAndroidTestRelease was configured but not added ..." warning.
+        val androidAndroidTestRelease by getting
+        @Suppress("UNUSED_VARIABLE") val androidTest by getting {
+            dependsOn(androidAndroidTestRelease)
+        }
     }
 }
 
 android {
-    compileSdkVersion(31)
+    compileSdk = 31
     sourceSets["main"].manifest.srcFile("src/androidMain/AndroidManifest.xml")
     defaultConfig {
-        minSdkVersion(24)
-        targetSdkVersion(31)
+        minSdk = 21
+        targetSdk = 31
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
     }
 }

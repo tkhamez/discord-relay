@@ -1,0 +1,111 @@
+
+name: Create Release
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  build-linux:
+    name: Build Linux, Android and console app
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Setup Java
+        uses: actions/setup-java@v2
+        with:
+          distribution: 'temurin'
+          java-version: 17
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v2
+      - name: Install build tools
+        run: sudo apt-get install -y apksigner zipalign
+      - name: Get version
+        id: get_version
+        run: echo ::set-output name=VERSION::${GITHUB_REF#refs/tags/}
+      - name: Build
+        run: |
+          ./gradlew packageUberJarForCurrentOS
+          ./gradlew createDistributable
+          ./gradlew android:build
+          ./gradlew console:build
+          ./gradlew android:build
+          cp misc/DiscordRelay.desktop desktop/build/compose/binaries/main/app/DiscordRelay
+          tar -czvf DiscordRelay-linux-${{ steps.get_version.outputs.VERSION }}.tar.gz -C desktop/build/compose/binaries/main/app DiscordRelay
+          cp android/build/outputs/apk/debug/android-debug.apk DiscordRelay-android-${{ steps.get_version.outputs.VERSION }}-debug.apk
+          cp console/build/distributions/DiscordRelay.zip DiscordRelay-console-${{ steps.get_version.outputs.VERSION }}.zip
+          cp android/build/outputs/apk/debug/android-debug.apk DiscordRelay-android-${{ steps.get_version.outputs.VERSION }}-debug.apk
+      - name: Sign APK
+        run: |
+          echo '${{ secrets.KEY_STORE }}' | base64 --decode > key-store.jks
+          zipalign -p -f -v 4 android/build/outputs/apk/release/android-release-unsigned.apk DiscordRelay-android-${{ steps.get_version.outputs.VERSION }}.apk
+          apksigner sign --ks key-store.jks --ks-pass pass:${{ secrets.KEY_STORE_PASS }} DiscordRelay-android-${{ steps.get_version.outputs.VERSION }}.apk
+      - name: GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            desktop/build/compose/jars/DiscordRelay-linux-x64-${{ steps.get_version.outputs.VERSION }}.jar
+            DiscordRelay-linux-${{ steps.get_version.outputs.VERSION }}.tar.gz
+            DiscordRelay-console-${{ steps.get_version.outputs.VERSION }}.zip
+            DiscordRelay-android-${{ steps.get_version.outputs.VERSION }}.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-macos:
+    name: Build macOS app
+    runs-on: macos-11
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Setup Java
+        uses: actions/setup-java@v2
+        with:
+          distribution: 'temurin'
+          java-version: 17
+      - name: Get version
+        id: get_version
+        run: echo ::set-output name=VERSION::${GITHUB_REF#refs/tags/}
+      - name: Build
+        run: |
+          ./gradlew packageUberJarForCurrentOS
+          ./gradlew createDistributable
+          tar -czvf DiscordRelay-macos-${{ steps.get_version.outputs.VERSION }}.tar.gz -C desktop/build/compose/binaries/main/app DiscordRelay.app
+      - name: GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            desktop/build/compose/jars/DiscordRelay-macos-x64-${{ steps.get_version.outputs.VERSION }}.jar
+            DiscordRelay-macos-${{ steps.get_version.outputs.VERSION }}.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-windows:
+    name: Build Windows app
+    runs-on: windows-2022
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Setup Java
+        uses: actions/setup-java@v2
+        with:
+          distribution: 'temurin'
+          java-version: 17
+      - name: Get version
+        id: get_version
+        run: echo '::set-output name=VERSION::1.0.0'
+      - name: Build
+        run: |
+          .\gradlew packageUberJarForCurrentOS
+          .\gradlew createDistributable
+          rm desktop\build\compose\binaries\main\app\DiscordRelay\DiscordRelay.ico
+          Compress-Archive -Path desktop\build\compose\binaries\main\app\DiscordRelay -DestinationPath DiscordRelay-windows-${{ steps.get_version.outputs.VERSION }}.zip
+      - name: GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            desktop\build\compose\jars\DiscordRelay-windows-x64-${{ steps.get_version.outputs.VERSION }}.jar
+            DiscordRelay-windows-${{ steps.get_version.outputs.VERSION }}.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

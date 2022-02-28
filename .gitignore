@@ -1,9 +1,18 @@
 /.gradle
 /.idea
 
+/build
 /android/build
 /common/build
+/console/build
 /desktop/build
+/lib/build
+/server/build
+
+/misc/key-store.jks
 
 /*.hprof
 /local.properties
+
+.DS_Store
+._.DS_Store

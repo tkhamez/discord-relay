@@ -4,30 +4,32 @@ plugins {
     kotlin("android")
 }
 
-group = "tkhamez.discordRelay"
-version = "1.0"
-
 repositories {
-    jcenter()
+    mavenCentral()
 }
 
 dependencies {
+    implementation(project(":lib"))
     implementation(project(":common"))
     implementation("androidx.activity:activity-compose:1.4.0")
 }
 
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
+    kotlinOptions.jvmTarget = "11"
+}
+
 android {
-    compileSdkVersion(31)
+    compileSdk = 31
     defaultConfig {
         applicationId = "tkhamez.discordRelay.android"
-        minSdkVersion(24)
-        targetSdkVersion(31)
+        minSdk = 21
+        targetSdk = 31
         versionCode = 1
-        versionName = "1.0"
+        versionName = "1.0.0"
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
     }
     buildTypes {
         getByName("release") {

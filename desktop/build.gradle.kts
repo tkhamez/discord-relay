@@ -6,9 +6,6 @@ plugins {
     id("org.jetbrains.compose") version "1.0.0"
 }
 
-group = "tkhamez.discordRelay"
-version = "1.0"
-
 kotlin {
     jvm {
         compilations.all {
@@ -17,24 +14,39 @@ kotlin {
         withJava()
     }
     sourceSets {
-        val jvmMain by getting {
+        @Suppress("UNUSED_VARIABLE") val jvmMain by getting {
             dependencies {
+                implementation(project(":lib"))
                 implementation(project(":common"))
                 implementation(compose.desktop.currentOs)
             }
         }
-        val jvmTest by getting
     }
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_11
+    targetCompatibility = JavaVersion.VERSION_11
 }
 
 compose.desktop {
     application {
-        mainClass = "MainKt"
+        mainClass = "tkhamez.discordRelay.desktop.MainKt"
         nativeDistributions {
+            modules("java.sql")
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             //targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Rpm)
-            packageName = "jvm"
+            packageName = "DiscordRelay"
             packageVersion = "1.0.0"
+            macOS {
+                iconFile.set(project.file("src/jvmMain/resources/app-icon.icns"))
+            }
+            windows {
+                iconFile.set(project.file("src/jvmMain/resources/app-icon.ico"))
+            }
+            linux {
+                iconFile.set(project.file("src/jvmMain/resources/app-icon.png"))
+            }
         }
     }
 }

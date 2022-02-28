@@ -1,7 +1,6 @@
 buildscript {
     repositories {
         gradlePluginPortal()
-        jcenter()
         google()
         mavenCentral()
     }
@@ -10,9 +9,6 @@ buildscript {
         classpath("com.android.tools.build:gradle:7.0.4")
     }
 }
-
-group = "tkhamez.discordRelay"
-version = "1.0"
 
 allprojects {
     repositories {

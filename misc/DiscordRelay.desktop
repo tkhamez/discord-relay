@@ -1,0 +1,8 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=DiscordRelay
+#Icon=/path/to/lib/DiscordRelay.png
+#Exec=/path/to/bin/DiscordRelay
+Exec=sh -e -c "exec \\"\\$(dirname \\"\\$0\\")/bin/DiscordRelay\\"" %k
+Terminal=false
