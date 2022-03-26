@@ -45,7 +45,7 @@ actual fun saveConfig(context: Any?, config: Config) {
     if (context !is Context) {
         return
     }
-    CoroutineScope(Dispatchers.Default).launch {
+    CoroutineScope(Dispatchers.IO).launch {
         context.dataStore.edit { settings ->
             settings[CONFIG_API_BASE_URL] = config.apiBaseUrl
             settings[CONFIG_TOKEN] = config.token

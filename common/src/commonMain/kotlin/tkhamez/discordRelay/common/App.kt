@@ -142,7 +142,7 @@ private fun startEventListener(context: Any?) {
     eventsCoroutine = mainScope.launch {
         while (true) {
             val event = gateway.eventsTake()
-            if (event == EVENT_CLOSED || event == EVENT_CLOSE) {
+            if (event == EVENT_CLOSED) {
                 stopGateway(context)
             }
         }
@@ -345,7 +345,7 @@ private fun debugButtons() {
     val gateway = getGateway()
     Button(onClick = { gateway.testCloseResumeOK() }) { Text("D close resume OK") }
     Button(onClick = { gateway.testCloseResumeNOK() }) { Text("D close resume NOK") }
-    Button(onClick = { gateway.testResume() }) { Text("D resume") }
+    Button(onClick = { gateway.testStopHeartbeat() }) { Text("D stop heartbeat") }
     Button(onClick = { gateway.testSend("message") }) { Text("D request: send message") }
     Button(onClick = { gateway.testSend("heartbeat") }) { Text("D request: request heartbeat") }
     Button(onClick = { gateway.testSend("invalid_ready") }) { Text("D request: invalid ready") }

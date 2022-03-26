@@ -31,12 +31,9 @@ jobs:
           ./gradlew createDistributable
           ./gradlew android:build
           ./gradlew console:build
-          ./gradlew android:build
           cp misc/DiscordRelay.desktop desktop/build/compose/binaries/main/app/DiscordRelay
           tar -czvf DiscordRelay-linux-${{ steps.get_version.outputs.VERSION }}.tar.gz -C desktop/build/compose/binaries/main/app DiscordRelay
-          cp android/build/outputs/apk/debug/android-debug.apk DiscordRelay-android-${{ steps.get_version.outputs.VERSION }}-debug.apk
           cp console/build/distributions/DiscordRelay.zip DiscordRelay-console-${{ steps.get_version.outputs.VERSION }}.zip
-          cp android/build/outputs/apk/debug/android-debug.apk DiscordRelay-android-${{ steps.get_version.outputs.VERSION }}-debug.apk
       - name: Sign APK
         run: |
           echo '${{ secrets.KEY_STORE }}' | base64 --decode > key-store.jks
@@ -94,7 +91,7 @@ jobs:
           java-version: 17
       - name: Get version
         id: get_version
-        run: echo '::set-output name=VERSION::1.0.0'
+        run: echo '::set-output name=VERSION::1.1.0'
       - name: Build
         run: |
           .\gradlew packageUberJarForCurrentOS

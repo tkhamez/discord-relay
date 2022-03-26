@@ -1,5 +1,6 @@
 package tkhamez.discordRelay.lib
 
+import com.google.gson.Gson
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.features.*
@@ -34,19 +35,24 @@ class Webhook(private val messages: BlockingQueue<String>) {
 
         val user = messageReceived.author?.username + "#" + messageReceived.author?.discriminator
         val time = messageReceived.timestamp?.replace("T", " ")?.substring(0, 19)
+        val footer = DiscordMessageEmbed(
+            footer = DiscordMessageEmbedFooter(
+                text = "Original message - Author: $user, Date: $time UTC, " +
+                    "Guild: ${messageReceived.guild_id}, Channel: ${messageReceived.channel_id}"
+            )
+        )
+
+        val embeds = buildEmbedsFromMessage(messageReceived)
+        embeds.add(footer)
+
         val payload = HttpRequestMessage(
             username = messageReceived.member?.nick,
             content = content,
-            embeds = listOf(
-                HttpRequestMessageEmbeds(
-                    footer = HttpRequestMessageEmbedsText(
-                        text = "Original message sent by $user on $time UTC in ${messageReceived.channel_id}"
-                    )
-                )
-            ),
+            embeds = embeds,
         )
 
-        log("HTTP request: POST ${Config.webhook}")
+        log("HTTP request: POST ${Config.webhook}:")
+        log(Gson().toJson(payload))
         try {
             httpClient.request<String>(Config.webhook) {
                 method = HttpMethod.Post
@@ -91,5 +97,27 @@ class Webhook(private val messages: BlockingQueue<String>) {
         }
 
         return ""
+    }
+
+    private fun buildEmbedsFromMessage(messageReceived: WsReceiveMessageCreate): MutableList<DiscordMessageEmbed> {
+        val result = mutableListOf<DiscordMessageEmbed>()
+
+        // Include up to 8 embeds
+        messageReceived.embeds?.forEachIndexed { index, embed ->
+            if (index < 7) {
+                result.add(embed)
+            }
+        }
+
+        // Add all attachments to one embed
+        val attachmentsFields = mutableListOf<DiscordMessageEmbedField>()
+        messageReceived.attachments?.forEach {
+            attachmentsFields.add(DiscordMessageEmbedField(name = it.filename, value = it.url))
+        }
+        if (attachmentsFields.size > 0) {
+            result.add(DiscordMessageEmbed(title = "Attachments", fields = attachmentsFields))
+        }
+
+        return result
     }
 }

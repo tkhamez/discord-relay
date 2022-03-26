@@ -27,13 +27,19 @@ object ResString {
         private set
     var errorConnection = "Connection error: "
         private set
+    var reconnectAttempt = "Reconnect attempt in $1 seconds."
+        private set
+    var reconnectAttemptCanceled = "Reconnect attempt canceled."
+        private set
     var errorReceiving = "Error while receiving: "
         private set
     var messageError = "Could not handle message: "
         private set
     var cannotResume = "Cannot resume connection."
         private set
-    var resumed = "Connection resumed."
+    var connectionLost = "Connection lost."
+        private set
+    var connectionResumed = "Connection resumed."
         private set
     var invalidHello = "Invalid data from HELLO message."
         private set
@@ -70,10 +76,13 @@ object ResString {
             connected = "Verbunden."
             disconnected = "Getrennt"
             errorConnection = "Verbindungsfehler: "
+            reconnectAttempt = "Erneuter Verbindungsversuch in $1 Sekunden."
+            reconnectAttemptCanceled = "Erneuter Verbindungsversuch abgebrochen."
             errorReceiving = "Fehler beim Empfang: "
             messageError = "Die Nachricht konnte nicht verarbeitet werden: "
             cannotResume = "Die Verbindung kann nicht wiederhergestellt werden."
-            resumed = "Verbindung wiederhergestellt."
+            connectionLost = "Verbindung verloren."
+            connectionResumed = "Verbindung wiederhergestellt."
             invalidHello = "Ungültige Daten aus der HELLO-Nachricht."
             ready = "Bereit zum Empfang von Nachrichten."
             readyError = "Es wurde ein ungültiges READY-Ereignis empfangen."

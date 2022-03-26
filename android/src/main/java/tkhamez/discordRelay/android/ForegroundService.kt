@@ -5,19 +5,23 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.*
 import tkhamez.discordRelay.lib.*
 
 class ForegroundService : Service() {
 
+    private var wakeLock: PowerManager.WakeLock? = null
+
     private var job: Job? = null
 
     override fun onStartCommand(intent: Intent, flags: Int, startId: Int): Int {
-        val channelId = ResString.appName // Must be unique per package
+        val channelId = "DiscordRelay WebSocket" // Must be unique per package
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) { // >= 8 (Orio), API 26
             // IMPORTANCE_LOW = No sound
@@ -41,7 +45,14 @@ class ForegroundService : Service() {
             .build()
         startForeground(1, notification)
 
-        job = CoroutineScope(Dispatchers.Default).launch {
+        @SuppressLint("WakelockTimeout")
+        wakeLock = (getSystemService(Context.POWER_SERVICE) as PowerManager).run {
+            newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "DiscordRelay::WakelockTag").apply {
+                acquire()
+            }
+        }
+
+        job = CoroutineScope(Dispatchers.IO).launch {
             getGateway().init()
         }
 
@@ -53,7 +64,14 @@ class ForegroundService : Service() {
     }
 
     override fun onDestroy() {
-        // Run it blocking and delay it a bit to give the program time to close the websocket properly and
+        wakeLock?.let {
+            if (it.isHeld) {
+                it.release()
+            }
+        }
+        wakeLock = null
+
+        // Run it blocking and delay it a bit to give the program time to close the WebSocket properly and
         // display the disconnect message.
         runBlocking {
             getGateway().close()

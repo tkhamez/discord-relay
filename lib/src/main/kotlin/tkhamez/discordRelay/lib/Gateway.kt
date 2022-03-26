@@ -12,8 +12,7 @@ import io.ktor.http.cio.websocket.*
 import kotlinx.coroutines.*
 import java.util.concurrent.BlockingQueue
 
-const val EVENT_CLOSED = 2
-const val EVENT_CLOSE = 3
+const val EVENT_CLOSED = 1
 
 private const val OP_DISPATCH = 0
 private const val OP_HEARTBEAT = 1
@@ -53,7 +52,8 @@ class Gateway(
     private var webSocketSession: DefaultWebSocketSession? = null
 
     private var sequenceNumber: Int? = null
-    private var shouldResume = false
+    private var tryResumeConnection = false
+    private var trySendResume = false
     private var clientClosed = false
     private var sessionId: String? = null
     private var lastSend: Long = 0
@@ -61,9 +61,11 @@ class Gateway(
     private var identifySent = false
     private var identifyLastSend: Long = 0
 
-    private var heartbeatStarted = false
-    private var heartbeatLastSend: Long = 0
     private var heartbeatLastAck: Long = 0
+    private var heartbeatJob: Job? = null
+
+    private var retryJob: Job? = null
+    private var closed = false
 
     fun putDummyMessage() {
         messages.put("")
@@ -81,6 +83,10 @@ class Gateway(
             return false
         }
 
+        // Move this up here, it can prevent a "ForegroundServiceDidNotStartInTimeException" on Android if you
+        // click the connect button very fast several times without an internet connection.
+        lastConnectionAttempt = System.currentTimeMillis()
+
         if (connectingOrConnected) {
             withContext(Dispatchers.IO) { messages.put(ResString.alreadyConnectingOrConnected) }
             return false
@@ -88,11 +94,13 @@ class Gateway(
         connectingOrConnected = true
 
         if (!fetchGatewayUrl()) {
+            connectingOrConnected = false
+            // need to send this for Android to stop the service
+            withContext(Dispatchers.IO) { events.put(EVENT_CLOSED) }
             return false
         }
 
         // Connect
-        lastConnectionAttempt = System.currentTimeMillis()
         gatewayResponse?.url?.let { connect(it) }
 
         return true
@@ -103,27 +111,27 @@ class Gateway(
     }
 
     fun testCloseResumeOK() {
-        shouldResume = true
+        tryResumeConnection = true
         clientClosed = true
-        CoroutineScope(Dispatchers.Default).launch {
+        CoroutineScope(Dispatchers.IO).launch {
             webSocketSession?.close(CloseReason(CloseReason.Codes.PROTOCOL_ERROR, "")) // resume will work
         }
     }
 
     fun testCloseResumeNOK() {
-        shouldResume = true
+        tryResumeConnection = true
         clientClosed = true
-        CoroutineScope(Dispatchers.Default).launch {
+        CoroutineScope(Dispatchers.IO).launch {
             webSocketSession?.close(CloseReason(CloseReason.Codes.GOING_AWAY, "")) // resume will not work
         }
     }
 
-    fun testResume() {
-        CoroutineScope(Dispatchers.Default).launch { resumeConnection() }
+    fun testStopHeartbeat() {
+        heartbeatJob?.cancel()
     }
 
     fun testSend(text: String) {
-        CoroutineScope(Dispatchers.Default).launch { send(text) }
+        CoroutineScope(Dispatchers.IO).launch { send(text) }
     }
 
     /**
@@ -146,7 +154,6 @@ class Gateway(
                 }
             } catch (t: Throwable) {
                 withContext(Dispatchers.IO) { messages.put("${ResString.error}: ${t.message.toString()}") }
-                connectingOrConnected = false
                 return false
             }
             log("HTTP response: $response")
@@ -161,7 +168,6 @@ class Gateway(
 
         if (gatewayResponseTemp == null) {
             withContext(Dispatchers.IO) { messages.put(ResString.failedGatewayURL) }
-            connectingOrConnected = false
             return false
         }
 
@@ -176,7 +182,6 @@ class Gateway(
             withContext(Dispatchers.IO) {
                 messages.put(ResString.sessionStartLimitReached.replace("$1", resetAfter.toString()))
             }
-            connectingOrConnected = false
             return false
         }
 
@@ -192,23 +197,34 @@ class Gateway(
         }
         messages.put(ResString.connecting)
 
-        CoroutineScope(Dispatchers.Default).launch {
+        CoroutineScope(Dispatchers.IO).launch {
             try {
+                clientClosed = false
+                identifySent = false
+                closed = false
                 httpClient.webSocket(url) {
                     log("WS connected")
-                    clientClosed = false
-                    identifySent = false
                     webSocketSession = this
                     withContext(Dispatchers.IO) { messages.put(ResString.connected) }
                     readMessages()
                 }
             } catch (t: Throwable) {
+                val retryTimeSec: Long = 20
                 withContext(Dispatchers.IO) { messages.put(ResString.errorConnection + t.message) }
-                withContext(Dispatchers.IO) { events.put(EVENT_CLOSED) }
-                connectingOrConnected = false
+                withContext(Dispatchers.IO) {
+                    messages.put(ResString.reconnectAttempt.replace("$1", retryTimeSec.toString()))
+                }
+                trySendResume = false
+                retryJob = CoroutineScope(Dispatchers.IO).launch {
+                    delay(retryTimeSec * 1000)
+                    handleClose()
+                }
                 return@launch
             }
-            webSocketSession?.let { handleClose(it.closeReason) }
+            webSocketSession?.let {
+                val reason = it.closeReason.await()
+                handleClose(reason)
+            }
         }
     }
 
@@ -218,7 +234,7 @@ class Gateway(
                 message as? Frame.Text ?: continue
                 val msg = message.readText()
                 log("WS received: $msg")
-                CoroutineScope(Dispatchers.Default).launch {
+                CoroutineScope(Dispatchers.IO).launch {
                     try {
                         handleMessage(msg)
                     } catch (t: Throwable) {
@@ -231,42 +247,51 @@ class Gateway(
         }
     }
 
-    private suspend fun handleClose(closeReason: Deferred<CloseReason?>) {
-        val reason = closeReason.await()
+    private suspend fun handleClose(reason: CloseReason? = null) {
+        closed = true
         val closeCode: Short = reason?.code ?: 0
         val closeMessage: String = reason?.message ?: ""
 
-        val who = if (clientClosed) ResString.client else ResString.server
-        withContext(Dispatchers.IO) {
-            messages.put("${ResString.disconnected} ($who, $closeCode $closeMessage).")
+        if (closeCode > 0) { // not when trying to reconnect after a delay
+            val who = if (clientClosed) ResString.client else ResString.server
+            withContext(Dispatchers.IO) {
+                messages.put("${ResString.disconnected} ($who, $closeCode $closeMessage).")
+            }
         }
 
         if (
             !closeCodesStop.contains(closeCode) &&
-            (!clientClosed || shouldResume || closeCodesReconnect.contains(closeCode))
+            (!clientClosed || tryResumeConnection || closeCodesReconnect.contains(closeCode))
         ) {
-            shouldResume = true
-            resumeConnection()
-        } else if (!shouldResume) {
+            resumeTheConnection()
+        } else if (!tryResumeConnection) {
             sessionId = null
-            withContext(Dispatchers.IO) { events.put(EVENT_CLOSED) }
             connectingOrConnected = false
+            withContext(Dispatchers.IO) { events.put(EVENT_CLOSED) }
         }
+        tryResumeConnection = false
     }
 
     private suspend fun close(code: CloseReason.Codes, reason: String = "") {
         clientClosed = true
+        if (!tryResumeConnection && retryJob?.isActive == true) {
+            withContext(Dispatchers.IO) { messages.put(ResString.reconnectAttemptCanceled) }
+        }
+        retryJob?.cancel()
         webSocketSession?.close(CloseReason(code, reason))
+        connectingOrConnected = false
+        // It's not necessary to send EVENT_CLOSED here.
         log("WS closed ($code)")
     }
 
-    private suspend fun resumeConnection() {
+    private suspend fun resumeTheConnection() {
+        trySendResume = true
         gatewayResponse?.url?.let {
             connect(it)
         } ?: run {
+            connectingOrConnected = false
             withContext(Dispatchers.IO) { messages.put(ResString.cannotResume) }
             withContext(Dispatchers.IO) { events.put(EVENT_CLOSED) }
-            connectingOrConnected = false
         }
     }
 
@@ -294,14 +319,10 @@ class Gateway(
                 withContext(Dispatchers.IO) { messages.put(ResString.invalidHello) }
                 return
             }
-            if (!heartbeatStarted) {
-                heartbeatStarted = true
-                startHeartbeats(messageHello.heartbeat_interval)
-                heartbeatStarted = false
-            }
-            if (shouldResume) { // check resume first
+            startHeartbeats(messageHello.heartbeat_interval)
+            if (trySendResume) { // check resume first
+                trySendResume = false
                 sendResume()
-                shouldResume = false
             } else if (!identifySent) {
                 sendIdentify()
                 identifySent = true
@@ -325,10 +346,11 @@ class Gateway(
                     withContext(Dispatchers.IO) { messages.put(ResString.ready) }
                 } else {
                     withContext(Dispatchers.IO) { messages.put(ResString.readyError) }
+                    tryResumeConnection = true
                     close(CloseReason.Codes.PROTOCOL_ERROR, CLOSE_REASON_MESSAGE_PROTOCOL_ERROR)
                 }
             } else if (message.t == EVENT_RESUMED) {
-                withContext(Dispatchers.IO) { messages.put(ResString.resumed) }
+                withContext(Dispatchers.IO) { messages.put(ResString.connectionResumed) }
             } else if (message.t == EVENT_MESSAGE_CREATE) {
                 val messageMessageCreate = gson.fromJson(gson.toJson(message.d), WsReceiveMessageCreate::class.java)
                 relayMessage(messageMessageCreate)
@@ -337,9 +359,10 @@ class Gateway(
     }
 
     private fun startHeartbeats(heartbeatInterval: Long) {
-        heartbeatLastSend = 0
+        heartbeatJob?.cancel()
         heartbeatLastAck = 0
-        CoroutineScope(Dispatchers.Default).launch {
+        var heartbeatLastSend: Long = 0
+        heartbeatJob = CoroutineScope(Dispatchers.IO).launch {
             while (webSocketSession?.isActive == true) {
                 // Wait first
                 var sleep = heartbeatInterval
@@ -351,7 +374,7 @@ class Gateway(
                 // Check last acknowledge
                 if (heartbeatLastSend > heartbeatLastAck) {
                     // probably failed or "zombied" connection, terminate and resume
-                    shouldResume = true
+                    tryResumeConnection = true
                     close(CloseReason.Codes.PROTOCOL_ERROR, CLOSE_REASON_MESSAGE_PROTOCOL_ERROR)
                     break
                 }
@@ -359,6 +382,13 @@ class Gateway(
                 // Send heartbeat
                 sendHeartbeat()
                 heartbeatLastSend = System.currentTimeMillis()
+            }
+
+            if (!clientClosed && !closed && retryJob?.isActive != true) {
+                // e.g. when the internet connection was lost the socket is not active but the close
+                // event did not fire. Calling close() now doesn't work.
+                withContext(Dispatchers.IO) { messages.put(ResString.connectionLost) }
+                resumeTheConnection()
             }
         }
     }

@@ -15,6 +15,8 @@ import java.util.*
 private var lastDisconnectCode: CloseReason.Codes? = null
 
 private val lastHeartbeat = mutableMapOf<String, Long>()
+private const val heartbeatInterval: Long = 40100
+private const val heartbeatCheckInterval: Long = 60100
 
 /**
  * Mockup of the Discord API and WebSocket server.
@@ -37,11 +39,10 @@ fun main() {
                 val id = UUID.randomUUID().toString()
                 lastHeartbeat[id] = 0
 
-                sendMessage("{\"op\":10,\"d\":{\"heartbeat_interval\":40100}}", id) // Hello
-                //sendMessage("{\"op\":10,\"d\":{\"heartbeat_interval\":5000}}")
+                sendMessage("{\"op\":10,\"d\":{\"heartbeat_interval\":$heartbeatInterval}}", id) // Hello
 
                 // The error shown below is a bug https://youtrack.jetbrains.com/issue/KTIJ-19704, it works
-                CoroutineScope(Dispatchers.Default).launch {
+                val checkHeartbeatJob = CoroutineScope(Dispatchers.IO).launch {
                     checkHeartbeat(id)
                 }
 
@@ -50,6 +51,7 @@ fun main() {
                     handleMessage(frame.readText(), id)
                 }
 
+                checkHeartbeatJob.cancel()
                 val reason = this.closeReason.await()
                 lastDisconnectCode = reason?.knownReason
                 log("$id $reason")
@@ -60,10 +62,14 @@ fun main() {
 }
 
 private suspend fun DefaultWebSocketServerSession.checkHeartbeat(id: String) {
-    while (true) {
-        delay(60000)
-        if ((lastHeartbeat[id] ?: 0) < System.currentTimeMillis() - 50000) {
+    var check = true
+    while (check) {
+        delay(heartbeatCheckInterval)
+        log("$id check heartbeat")
+        if ((lastHeartbeat[id] ?: 0) < System.currentTimeMillis() - heartbeatCheckInterval) {
             close(CloseReason(1000, ""))
+            log("$id closed (no heartbeat)")
+            check = false
         }
     }
 }

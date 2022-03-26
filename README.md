@@ -9,7 +9,7 @@ Discord Bot:
 - Create a new application at https://discord.com/developers/applications.
 - Add bot - *don't* make it public.
 - Copy the bot token for configuring this app.
-- Go OAuth2 -> URL Generator, at "Scopes" check `bot` and then the following bot permissions:
+- Go to OAuth2 -> URL Generator, at "Scopes" check `bot` and then the following bot permissions:
   `Read Messages/View Channels`, `Read Message History`.
 - Copy the URL and open it in the browser to add the bot to your server.
 - Add bot to the channels that it should read.
@@ -21,11 +21,13 @@ Webhook:
 ## Notes
 
 - If a message has been edited, it will currently not be relayed again.
-- The app does not currently attempt to reconnect when the Internet connection is lost or similar errors occur.
+- Messages in threads will currently not be relayed.
 - There's a limit of 1000 connections (excluding resumes) withing 24 hours. The bot token will be invalidated if this 
   limit is exceeded. The app tries to keep track of this.
 - Read [this](https://support.discord.com/hc/en-us/articles/115002192352) and 
   [this](https://discord.com/guidelines#respect-discord) if you consider using a user token.
+- Android: This app can significantly affect battery life as it has to constantly send data to Discord to maintain
+  the WebSocket connection.
 - The app icon is from https://www.appiconsios.com.
 
 The configuration values for the desktop and Android apps are stored in different locations depending on the operating

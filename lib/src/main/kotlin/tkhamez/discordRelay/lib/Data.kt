@@ -20,14 +20,7 @@ data class HttpResponseChannelMessage(
 data class HttpRequestMessage(
     val username: String? = null,
     val content: String? = null,
-    val embeds: List<HttpRequestMessageEmbeds>? = null,
-)
-data class HttpRequestMessageEmbeds(
-    val color: String? = null,
-    val footer: HttpRequestMessageEmbedsText? = null,
-)
-data class HttpRequestMessageEmbedsText(
-    val text: String? = null,
+    val embeds: List<DiscordMessageEmbed>? = null,
 )
 
 data class WsReceive(
@@ -50,6 +43,8 @@ data class WsReceiveMessageCreate(
     val channel_id: String? = null,
     val author: WsReceiveMessageCreateAuthor? = null,
     val guild_id: String? = null,
+    val attachments: List<DiscordMessageAttachment>? = null,
+    val embeds: List<DiscordMessageEmbed>? = null,
 )
 data class WsReceiveMessageCreateMember(val nick: String? = null)
 data class WsReceiveMessageCreateAuthor(val username: String? = null, val discriminator: String? = null)
@@ -62,3 +57,32 @@ data class WsSendIdentifyDataProperties(val `$os`: String, val `$browser`: Strin
 
 data class WsSendResume(val op: Int, val d: WsSendResumeData)
 data class WsSendResumeData(val token: String, val session_id: String, val seq: Int?)
+
+data class DiscordMessageEmbed(
+    val title: String? = null,
+    val url: String? = null,
+    val author: DiscordMessageEmbedAuthor? = null,
+    val description: String? = null,
+    val fields: List<DiscordMessageEmbedField>? = null,
+    val image: DiscordMessageEmbedURL? = null,
+    val thumbnail: DiscordMessageEmbedURL? = null,
+    val footer: DiscordMessageEmbedFooter? = null,
+)
+data class DiscordMessageEmbedFooter(
+    val text: String? = null,
+)
+data class DiscordMessageEmbedURL(
+    val url: String? = null,
+)
+data class DiscordMessageEmbedAuthor(
+    val name: String? = null,
+    val url: String? = null,
+    val icon_url: String? = null,
+)
+data class DiscordMessageEmbedField(
+    val name: String? = null,
+    val value: String? = null,
+    val inline: Boolean = false,
+)
+
+data class DiscordMessageAttachment(val url: String? = null, val filename: String? = null)

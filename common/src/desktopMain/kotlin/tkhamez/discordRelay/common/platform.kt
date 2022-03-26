@@ -53,11 +53,11 @@ actual fun loadConfig(context: Any?, config: Config) {
 }
 
 actual fun startGateway(context: Any?) {
-    gatewayJob = CoroutineScope(Dispatchers.Default).launch { getGateway().init() }
+    gatewayJob = CoroutineScope(Dispatchers.IO).launch { getGateway().init() }
 }
 
 actual fun stopGateway(context: Any?) {
-    CoroutineScope(Dispatchers.Default).launch {
+    CoroutineScope(Dispatchers.IO).launch {
         getGateway().close()
         gatewayJob?.cancel()
     }
