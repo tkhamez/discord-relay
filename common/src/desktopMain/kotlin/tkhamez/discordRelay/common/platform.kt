@@ -25,8 +25,6 @@ private const val CONFIG_CHANNEL_IDS = "channelIds"
 private const val CONFIG_ONLY_MENTION_EVERYONE = "onlyMentionEveryone"
 private const val CONFIG_WEBHOOK = "webhook"
 
-private var gatewayJob: Job? = null
-
 actual fun getUserLanguage(context: Any?): String {
     return System.getProperty("user.language")
 }
@@ -53,14 +51,11 @@ actual fun loadConfig(context: Any?, config: Config) {
 }
 
 actual fun startGateway(context: Any?) {
-    gatewayJob = CoroutineScope(Dispatchers.IO).launch { getGateway().init() }
+    getGateway().init()
 }
 
 actual fun stopGateway(context: Any?) {
-    CoroutineScope(Dispatchers.IO).launch {
-        getGateway().close()
-        gatewayJob?.cancel()
-    }
+    getGateway().close()
 }
 
 @Composable

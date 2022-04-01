@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.appendInlineContent
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.*
 import androidx.compose.runtime.*
@@ -20,16 +21,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.flow
 import tkhamez.discordRelay.lib.*
 import java.text.SimpleDateFormat
 import java.util.*
 
-private var mainScope = MainScope()
-
-private var messagesCoroutine: Job? = null
-private var eventsCoroutine: Job? = null
+private var messagesJob: Job? = null
+private var eventsJob: Job? = null
 private var messagesTextInitial = ""
-private var sendDummyMessage = false
 
 private const val LAYOUT_NARROW = 1
 private const val LAYOUT_WIDE = 2
@@ -51,12 +52,14 @@ fun App() {
 
     // Text for column 2, needs to be outside BoxWithConstraints.
     var messagesText by remember { mutableStateOf(messagesTextInitial) }
-    if (messagesCoroutine?.isActive != true) {
-        messagesCoroutine = mainScope.launch {
-            while (true) {
-                val message = messagesTake()
-                val now = SimpleDateFormat("HH:mm:ss").format(Date())
-                messagesText = "$now $message\n$messagesText"
+    if (messagesJob?.isActive != true) {
+        messagesJob = CoroutineScope(Dispatchers.Default).launch {
+            // prevent "java.lang.IllegalStateException: Reading a state that was created after the snapshot
+            //          was taken or in a snapshot that has not yet been applied"
+            delay(200)
+
+            startMessageListener().collect { value ->
+                messagesText = "$value\n$messagesText"
                 messagesTextInitial = messagesText // to restore text after destroy
             }
         }
@@ -65,38 +68,10 @@ fun App() {
     BoxWithConstraints {
         val width = maxWidth
         Column {
-
-            // Add headline with logo for Android
             if (androidContext != null) {
-                val annotatedString = buildAnnotatedString {
-                    appendInlineContent(id = "imageId")
-                    append("  " + tkhamez.discordRelay.lib.ResString.appName)
-                }
-                val inlineContentMap = mapOf(
-                    "imageId" to InlineTextContent(Placeholder(20.sp, 20.sp, PlaceholderVerticalAlign.TextCenter)) {
-                        loadLogo()?.let {
-                            Image(
-                                painter = it,
-                                modifier = Modifier.fillMaxSize(),
-                                contentDescription = "",
-                            )
-                        }
-                    }
-                )
-                Text(
-                    annotatedString,
-                    inlineContent = inlineContentMap,
-                    fontFamily = FontFamily.SansSerif,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp,
-                    modifier = Modifier
-                        .padding(4.dp, 4.dp, 4.dp, 0.dp)
-                        .fillMaxWidth()
-                        .wrapContentSize(Alignment.Center)
-                )
+                addHeadlineWithLogo()
             }
-
-            if (width < 720.dp) {
+            if (width < 600.dp) {
                 Column {
                     scrollableColumn(CONTENT_COL1, LAYOUT_NARROW, androidContext, messagesText)
                     scrollableColumn(CONTENT_COL2, LAYOUT_NARROW, androidContext, messagesText)
@@ -109,43 +84,42 @@ fun App() {
             }
         }
     }
-
-    // For some reason the first message is (sometimes) not shown after:
-    // - the app was started
-    // - the app was destroyed (via back button or by turning the display)
-    // - the app was resumed
-    if (sendDummyMessage) {
-        getGateway().putDummyMessage()
-        sendDummyMessage = false
-    }
 }
 
 /**
  * Only called on Android.
  */
 fun appOnDestroy() {
-    // Make sure that the coroutine is started again.
-    messagesCoroutine?.cancel()
+    // Make sure the jobs are started again.
+    messagesJob?.cancel()
+    eventsJob?.cancel()
+    messagesJob = null
+    eventsJob = null
 
-    // Reset cache or the displayed URL may be different from the used URL.
+    // Reset cache or the displayed URL can be different from the used URL.
     Config.gatewayResponse = null
     Config.gatewayResponseBot = mutableMapOf()
-
-    sendDummyMessage = true
 }
 
 private fun startEventListener(context: Any?) {
-    if (eventsCoroutine?.isActive == true) {
+    if (eventsJob?.isActive == true) {
         return
     }
-    val gateway = getGateway()
-    eventsCoroutine = mainScope.launch {
-        while (true) {
-            val event = gateway.eventsTake()
+    eventsJob = CoroutineScope(Dispatchers.Default).launch {
+        while (isActive) {
+            val event = eventsReceive()
             if (event == EVENT_CLOSED) {
                 stopGateway(context)
             }
         }
+    }
+}
+
+private fun startMessageListener(): Flow<String> = flow {
+    while (true) {
+        val message = messagesReceive()
+        val now = SimpleDateFormat("HH:mm:ss").format(Date())
+        emit("$now $message")
     }
 }
 
@@ -333,9 +307,41 @@ private fun gateway(context: Any?) {
 
 @Composable
 private fun messages(messages: String) {
+    SelectionContainer {
+        Text(
+            messages,
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+}
+
+@Composable
+fun addHeadlineWithLogo() {
+    val annotatedString = buildAnnotatedString {
+        appendInlineContent(id = "imageId")
+        append("  " + tkhamez.discordRelay.lib.ResString.appName)
+    }
+    val inlineContentMap = mapOf(
+        "imageId" to InlineTextContent(Placeholder(20.sp, 20.sp, PlaceholderVerticalAlign.TextCenter)) {
+            loadLogo()?.let {
+                Image(
+                    painter = it,
+                    modifier = Modifier.fillMaxSize(),
+                    contentDescription = "",
+                )
+            }
+        }
+    )
     Text(
-        messages,
-        modifier = Modifier.fillMaxWidth()
+        annotatedString,
+        inlineContent = inlineContentMap,
+        fontFamily = FontFamily.SansSerif,
+        fontWeight = FontWeight.Bold,
+        fontSize = 12.sp,
+        modifier = Modifier
+            .padding(4.dp, 4.dp, 4.dp, 0.dp)
+            .fillMaxWidth()
+            .wrapContentSize(Alignment.Center)
     )
 }
 
@@ -343,11 +349,16 @@ private fun messages(messages: String) {
 @Composable
 private fun debugButtons() {
     val gateway = getGateway()
+    Button(onClick = { messagesJob?.cancel() }) { Text("D Cancel messagesJob") }
     Button(onClick = { gateway.testCloseResumeOK() }) { Text("D close resume OK") }
     Button(onClick = { gateway.testCloseResumeNOK() }) { Text("D close resume NOK") }
     Button(onClick = { gateway.testStopHeartbeat() }) { Text("D stop heartbeat") }
     Button(onClick = { gateway.testSend("message") }) { Text("D request: send message") }
+    Button(onClick = { gateway.testSend("close-1001") }) { Text("D request: close 1001") }
+    Button(onClick = { gateway.testSend("message-empty") }) { Text("D request: send empty message") }
     Button(onClick = { gateway.testSend("heartbeat") }) { Text("D request: request heartbeat") }
+    Button(onClick = { gateway.testSend("heartbeat-no-ack") }) { Text("D no ACK next heartbeat") }
     Button(onClick = { gateway.testSend("invalid_ready") }) { Text("D request: invalid ready") }
+    Button(onClick = { gateway.testSend("close-no-resume") }) { Text("D close no resume") }
     Button(onClick = { gateway.testSend("{invalid}") }) { Text("D send invalid data") }
 }

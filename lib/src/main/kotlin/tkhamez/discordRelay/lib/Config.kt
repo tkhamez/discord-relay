@@ -27,6 +27,8 @@ object Config {
      */
     var gatewayResponseBot: MutableMap<String, HttpResponseGateway> = mutableMapOf()
 
+    val channels = mutableListOf<GuildChannel>()
+
     fun channelIdList(): List<String> {
         return channelIds.split(',')
     }

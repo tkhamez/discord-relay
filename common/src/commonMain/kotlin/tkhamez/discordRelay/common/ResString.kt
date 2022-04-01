@@ -15,7 +15,7 @@ object ResString {
         private set
     var channelIds = "Channel IDs (comma separated)"
         private set
-    var onlyMentionEveryone = "Only @everyone"
+    var onlyMentionEveryone = "Only @everyone, @here"
         private set
     var save = "Save"
         private set
@@ -40,7 +40,7 @@ object ResString {
             resetURL = "URL zurücksetzen"
             isBotToken = "Ist ein Bot-Token"
             channelIds = "Kanal IDs (kommasepariert)"
-            onlyMentionEveryone = "Nur @everyone"
+            onlyMentionEveryone = "Nur @everyone, @here"
             save = "Speichern"
             load = "Laden"
             connect = "Verbinden"

@@ -8,9 +8,11 @@ import io.ktor.client.features.json.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.utils.io.*
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import java.util.concurrent.BlockingQueue
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 private val httpClient = HttpClient(CIO) {
     install(JsonFeature)
@@ -19,105 +21,147 @@ private val httpClient = HttpClient(CIO) {
 /**
  * https://discord.com/developers/docs/resources/webhook
  * https://discord.com/developers/docs/resources/channel
+ * https://discord.com/developers/docs/topics/rate-limits
  */
-class Webhook(private val messages: BlockingQueue<String>) {
+class Webhook(private val messages: Channel<String>) {
 
-    suspend fun sendMessage(messageReceived: WsReceiveMessageCreate) {
+    private var lastException: ResponseException? = null
+    private var lastRequest: Long = 0
+    private var requestsQueued: Long = 0
+
+    suspend fun sendMessage(channelMessage: ChannelMessage) {
         if (Config.webhook.isEmpty()) {
-            withContext(Dispatchers.IO) { messages.put(ResString.missingWebhook) }
+            messagesSend(ResString.missingWebhook)
             return
         }
 
-        var content: String = messageReceived.content ?: ""
-        if (content.isEmpty()) {
-            content = loadContent(messageReceived)
+        if ((channelMessage.content ?: "").isEmpty()) {
+            loadContent(channelMessage)
         }
 
-        val user = messageReceived.author?.username + "#" + messageReceived.author?.discriminator
-        val time = messageReceived.timestamp?.replace("T", " ")?.substring(0, 19)
-        val footer = DiscordMessageEmbed(
-            footer = DiscordMessageEmbedFooter(
-                text = "Original message - Author: $user, Date: $time UTC, " +
-                    "Guild: ${messageReceived.guild_id}, Channel: ${messageReceived.channel_id}"
-            )
-        )
-
-        val embeds = buildEmbedsFromMessage(messageReceived)
-        embeds.add(footer)
-
-        val payload = HttpRequestMessage(
-            username = messageReceived.member?.nick,
-            content = content,
-            embeds = embeds,
+        val payload = HttpSendWebhook(
+            username = channelMessage.member?.nick,
+            content = channelMessage.content,
+            embeds = buildEmbedsFromMessage(channelMessage),
         )
 
         log("HTTP request: POST ${Config.webhook}:")
         log(Gson().toJson(payload))
-        try {
-            httpClient.request<String>(Config.webhook) {
-                method = HttpMethod.Post
-                header("Content-Type", "application/json")
-                body = payload
-            }
-        } catch (e: ResponseException) {
-            withContext(Dispatchers.IO) { messages.put("${ResString.relayFailed}: ${e.message}") }
-            log(e.message + " - Body: " + e.response.content.readRemaining().readText())
-            return
+
+        val result = request<String>(
+            Config.webhook,
+            mapOf("Content-Type" to "application/json"),
+            HttpMethod.Post,
+            payload,
+        )
+        if (result == null) {
+            messagesSend("${ResString.relayFailed}: ${lastException?.message}")
         }
 
-        withContext(Dispatchers.IO) { messages.put(ResString.messageRelayed) }
+        messagesSend(ResString.messageRelayed)
     }
 
-    private suspend fun loadContent(messageReceived: WsReceiveMessageCreate): String {
-        /*val url0 = "${Config.apiBaseUrl}/channels/${messageReceived.channel_id}/messages/${messageReceived.id}"
-        try {
-            val result0 = httpClient.get<String>(url0) { header("Authorization", Config.token) }
-            println(result0)
-        } catch (e: ResponseException) {
-            println(e.message)
-        }*/
-
-        val url = "${Config.apiBaseUrl}/channels/${messageReceived.channel_id}/messages?limit=10"
+    private suspend fun loadContent(channelMessage: ChannelMessage) {
+        val url = "${Config.apiBaseUrl}/channels/${channelMessage.channel_id}/messages?limit=10"
         log("HTTP request: GET $url")
 
-        val result: List<HttpResponseChannelMessage>
-        try {
-            result = httpClient.get(url) {
-                header("Authorization", (if (Config.isBotToken) "Bot " else "") + Config.token)
-            }
-        } catch (e: ResponseException) {
-            log(e.message + " - Body: " + e.response.content.readRemaining().readText())
-            return ""
-        }
+        val result = request<List<ChannelMessage>>(
+            url,
+            mapOf("Authorization" to (if (Config.isBotToken) "Bot " else "") + Config.token)
+        ) ?: return
 
         for (message in result) {
-            if (message.id == messageReceived.id) {
-                return message.content ?: ""
+            if (message.id == channelMessage.id) {
+                channelMessage.content = message.content
+                channelMessage.embeds = message.embeds
+                channelMessage.attachments = message.attachments
+                return
             }
         }
-
-        return ""
     }
 
-    private fun buildEmbedsFromMessage(messageReceived: WsReceiveMessageCreate): MutableList<DiscordMessageEmbed> {
-        val result = mutableListOf<DiscordMessageEmbed>()
+    private suspend inline fun <reified T> request(
+        url: String,
+        headers: Map<String, String>? = null,
+        httpMethod: HttpMethod = HttpMethod.Get,
+        requestBody: Any? = null,
+    ): T? {
+        // Very simple rate limit, max 1 request per second
+        if (lastRequest + (1000 * requestsQueued) + 1000 > System.currentTimeMillis()) {
+            requestsQueued++
+            log("Rate limit hit, requestsQueued: $requestsQueued")
+            delay(1000L * requestsQueued)
+        }
+        lastRequest = System.currentTimeMillis()
+        requestsQueued = (requestsQueued - 1).coerceAtLeast(0)
+
+        val result: T
+        try {
+            result = httpClient.request(url) {
+                method = httpMethod
+                if (requestBody != null) body = requestBody
+                headers {
+                    if (headers != null) {
+                        for (header in headers) {
+                            append(header.key, header.value)
+                        }
+                    }
+                }
+            }
+        } catch (e: ResponseException) {
+            lastException = e
+            log(e.message + " - Body: " + e.response.content.readRemaining().readText())
+            return null
+        }
+
+        log("HTTP received: $result")
+
+        return result
+    }
+
+    private fun buildEmbedsFromMessage(channelMessage: ChannelMessage): MutableList<ChannelMessageEmbed> {
+        val embeds = mutableListOf<ChannelMessageEmbed>()
 
         // Include up to 8 embeds
-        messageReceived.embeds?.forEachIndexed { index, embed ->
+        channelMessage.embeds?.forEachIndexed { index, embed ->
             if (index < 7) {
-                result.add(embed)
+                embeds.add(embed)
             }
         }
 
         // Add all attachments to one embed
-        val attachmentsFields = mutableListOf<DiscordMessageEmbedField>()
-        messageReceived.attachments?.forEach {
-            attachmentsFields.add(DiscordMessageEmbedField(name = it.filename, value = it.url))
+        val attachmentsFields = mutableListOf<ChannelMessageEmbedField>()
+        channelMessage.attachments?.forEach {
+            attachmentsFields.add(ChannelMessageEmbedField(name = it.filename, value = it.url))
         }
         if (attachmentsFields.size > 0) {
-            result.add(DiscordMessageEmbed(title = "Attachments", fields = attachmentsFields))
+            embeds.add(ChannelMessageEmbed(title = "Attachments", fields = attachmentsFields))
         }
 
-        return result
+        // Footer
+        val user = channelMessage.author?.username + "#" + channelMessage.author?.discriminator
+        val time = channelMessage.timestamp?.replace("T", " ")?.substring(0, 19)
+        var channelName = ""
+        var guildName = ""
+        Config.channels.forEach {
+            if (it.id == channelMessage.channel_id) {
+                channelName = it.name.toString().replace(',', ' ').replace(':', ' ')
+                guildName = it.guild?.name.toString().replace(',', ' ').replace(':', ' ')
+            }
+        }
+        val footer = ChannelMessageEmbed(
+            footer = ChannelMessageEmbedFooter(
+                text = "Original message - Author: $user, Date: $time UTC, " +
+                    "Channel: ${channelMessage.channel_id} $channelName, " +
+                    "Guild: ${channelMessage.guild_id} $guildName"
+            )
+        )
+        embeds.add(footer)
+
+        return embeds
+    }
+
+    private fun messagesSend(message: String) {
+        CoroutineScope(Dispatchers.Default).launch { messages.send(message) }
     }
 }

@@ -12,77 +12,76 @@ data class HttpResponseGatewaySession(
     val max_concurrency: Int? = null,
 )
 
-data class HttpResponseChannelMessage(
-    val id: String? = null,
-    val content: String? = null,
-)
-
-data class HttpRequestMessage(
+data class HttpSendWebhook(
     val username: String? = null,
     val content: String? = null,
-    val embeds: List<DiscordMessageEmbed>? = null,
+    val embeds: List<ChannelMessageEmbed>? = null,
 )
 
-data class WsReceive(
+data class WebSocketReceiveMessage(
     val t: Any? = null, // gateway event name
     val op: Int? = null, // Opcode
     val s: Int? = null, // Sequence number
-    val d: Any? = null // data
+    val d: Any? = null, // data
 )
 
-data class WsReceiveHello(val heartbeat_interval: Long? = null)
+data class WebSocketReceiveHello(val heartbeat_interval: Long? = null)
 
-data class WsReceiveReady(val session_id: String? = null)
+data class WebSocketReceiveReady(val session_id: String? = null, val guilds: List<DiscordGuild>? = null)
 
-data class WsReceiveMessageCreate(
+data class WebSocketSendHeartbeat(val op: Int, val d: Int?)
+
+data class WebSocketSendIdentify(val op: Int, val d: WebSocketSendIdentifyData)
+data class WebSocketSendIdentifyData(
+    val token: String,
+    val intents: Int,
+    val properties: WebSocketSendIdentifyDataProperties,
+)
+data class WebSocketSendIdentifyDataProperties(val `$os`: String, val `$browser`: String, val `$device`: String)
+
+data class WebSocketSendResume(val op: Int, val d: WebSocketSendResumeData)
+data class WebSocketSendResumeData(val token: String, val session_id: String, val seq: Int?)
+
+data class DiscordGuild(
+    val unavailable: Boolean? = null,
+    val id: String? = null,
+    val name: String? = null,
+    val channels: List<GuildChannel>? = null,
+)
+
+data class GuildChannel(
+    val id: String? = null,
+    val name: String? = null,
+    val guild: DiscordGuild? = null,
+)
+
+data class ChannelMessage(
     val timestamp: String? = null,
     val mention_everyone: Boolean? = null,
-    val member: WsReceiveMessageCreateMember? = null,
+    val member: ChannelMessageMember? = null,
     val id: String? = null,
-    val content: String? = null,
+    var content: String? = null,
     val channel_id: String? = null,
-    val author: WsReceiveMessageCreateAuthor? = null,
+    val author: ChannelMessageAuthor? = null,
     val guild_id: String? = null,
-    val attachments: List<DiscordMessageAttachment>? = null,
-    val embeds: List<DiscordMessageEmbed>? = null,
+    var attachments: List<ChannelMessageAttachment>? = null,
+    var embeds: List<ChannelMessageEmbed>? = null,
 )
-data class WsReceiveMessageCreateMember(val nick: String? = null)
-data class WsReceiveMessageCreateAuthor(val username: String? = null, val discriminator: String? = null)
+data class ChannelMessageMember(val nick: String? = null)
+data class ChannelMessageAuthor(val username: String? = null, val discriminator: String? = null)
+data class ChannelMessageAttachment(val url: String? = null, val filename: String? = null)
 
-data class WsSendHeartbeat(val op: Int, val d: Int?)
-
-data class WsSendIdentify(val op: Int, val d: WsSendIdentifyData)
-data class WsSendIdentifyData(val token: String, val intents: Int, val properties: WsSendIdentifyDataProperties)
-data class WsSendIdentifyDataProperties(val `$os`: String, val `$browser`: String, val `$device`: String)
-
-data class WsSendResume(val op: Int, val d: WsSendResumeData)
-data class WsSendResumeData(val token: String, val session_id: String, val seq: Int?)
-
-data class DiscordMessageEmbed(
+data class ChannelMessageEmbed(
     val title: String? = null,
     val url: String? = null,
-    val author: DiscordMessageEmbedAuthor? = null,
+    val author: ChannelMessageEmbedAuthor? = null,
     val description: String? = null,
-    val fields: List<DiscordMessageEmbedField>? = null,
-    val image: DiscordMessageEmbedURL? = null,
-    val thumbnail: DiscordMessageEmbedURL? = null,
-    val footer: DiscordMessageEmbedFooter? = null,
+    val fields: List<ChannelMessageEmbedField>? = null,
+    val image: ChannelMessageEmbedURL? = null,
+    val thumbnail: ChannelMessageEmbedURL? = null,
+    val footer: ChannelMessageEmbedFooter? = null,
 )
-data class DiscordMessageEmbedFooter(
-    val text: String? = null,
-)
-data class DiscordMessageEmbedURL(
-    val url: String? = null,
-)
-data class DiscordMessageEmbedAuthor(
-    val name: String? = null,
-    val url: String? = null,
-    val icon_url: String? = null,
-)
-data class DiscordMessageEmbedField(
-    val name: String? = null,
-    val value: String? = null,
-    val inline: Boolean = false,
-)
-
-data class DiscordMessageAttachment(val url: String? = null, val filename: String? = null)
+data class ChannelMessageEmbedAuthor(val name: String? = null, val url: String? = null, val icon_url: String? = null)
+data class ChannelMessageEmbedField(val name: String? = null, val value: String? = null, val inline: Boolean = false)
+data class ChannelMessageEmbedURL(val url: String? = null)
+data class ChannelMessageEmbedFooter(val text: String? = null)

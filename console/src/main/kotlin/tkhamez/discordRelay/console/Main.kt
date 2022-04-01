@@ -1,6 +1,6 @@
 package tkhamez.discordRelay.console
 
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.runBlocking
 import tkhamez.discordRelay.lib.*
 import kotlin.system.exitProcess
@@ -17,10 +17,10 @@ fun main() {
         exitProcess(0)
     }
 
+    getGateway().init()
     runBlocking {
-        launch { getGateway().init() }
-        while (true) {
-            log(messagesTake())
+        while (isActive) {
+            log(messagesReceive())
         }
     }
 }

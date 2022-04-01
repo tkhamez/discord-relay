@@ -1,6 +1,7 @@
 package tkhamez.discordServer.application
 
 import io.ktor.application.*
+import io.ktor.http.*
 import io.ktor.http.cio.websocket.*
 import io.ktor.request.*
 import io.ktor.response.*
@@ -15,8 +16,10 @@ import java.util.*
 private var lastDisconnectCode: CloseReason.Codes? = null
 
 private val lastHeartbeat = mutableMapOf<String, Long>()
+private val ignoreNextHeartbeat = mutableMapOf<String, Boolean>()
 private const val heartbeatInterval: Long = 40100
 private const val heartbeatCheckInterval: Long = 60100
+private var remaining = 980
 
 /**
  * Mockup of the Discord API and WebSocket server.
@@ -28,12 +31,21 @@ fun main() {
         routing {
             get("/api/gateway") {
                 val host = call.request.host()
-                call.respondText("{\"url\": \"ws://$host:8080\"}")
+                val data = "{\"url\": \"ws://$host:8080\"}"
+                log("HTTP send: $data")
+                call.respondText(data, contentType = ContentType.Application.Json)
             }
             get("/api/gateway/bot") {
                 val host = call.request.host()
-                val s = "{\"total\":1000,\"remaining\":980,\"reset_after\":59255492,\"max_concurrency\":1}"
-                call.respondText("{\"url\":\"ws://$host:8080\",\"shards\":1,\"session_start_limit\":$s}")
+                val s = "{\"total\":1000,\"remaining\":$remaining,\"reset_after\":59255492,\"max_concurrency\":1}"
+                val data = "{\"url\":\"ws://$host:8080\",\"shards\":1,\"session_start_limit\":$s}"
+                log("HTTP send: $data")
+                call.respondText(data, contentType = ContentType.Application.Json)
+            }
+            get("/api/channels/1234/messages") {
+                val data = "[" + getMessageJson("the empty message") + "]"
+                log("HTTP send: $data")
+                call.respondText(data, contentType = ContentType.Application.Json)
             }
             webSocket("/") {
                 val id = UUID.randomUUID().toString()
@@ -63,7 +75,7 @@ fun main() {
 
 private suspend fun DefaultWebSocketServerSession.checkHeartbeat(id: String) {
     var check = true
-    while (check) {
+    while (isActive && check) {
         delay(heartbeatCheckInterval)
         log("$id check heartbeat")
         if ((lastHeartbeat[id] ?: 0) < System.currentTimeMillis() - heartbeatCheckInterval) {
@@ -80,33 +92,51 @@ private suspend fun DefaultWebSocketServerSession.handleMessage(receivedText: St
         close(CloseReason(4002, "Error while decoding payload."))
     } else if (receivedText == "heartbeat") {
         sendMessage("{\"op\":1}", id) // request Heartbeat
+    } else if (receivedText == "heartbeat-no-ack") {
+        ignoreNextHeartbeat[id] = true
     } else if (receivedText == "invalid_ready") {
         sendMessage("{\"op\":0,\"t\":\"READY\",\"s\":2,\"d\":{}}", id) // invalid Ready
+    } else if (receivedText == "close-no-resume") {
+        close(CloseReason(4004, ""))
+    } else if (receivedText == "close-1001") {
+        close(CloseReason(1001, "WebSocket requesting client reconnect vom Server."))
     } else if (receivedText.contains("\"op\":1")) { // Heartbeat
         lastHeartbeat[id] = System.currentTimeMillis()
-        sendMessage("{\"op\":11}", id) // Heartbeat ACK
+        if (ignoreNextHeartbeat[id] != true) {
+            sendMessage("{\"op\":11}", id) // Heartbeat ACK
+        }
+        ignoreNextHeartbeat[id] = false
     } else if (receivedText.contains("\"op\":2")) { // Identify
-        val d = "{\"session_id\":\"123abc\"}"
-        sendMessage("{\"op\":0,\"t\":\"READY\",\"s\":2,\"d\":$d}", id) // Ready
+        remaining --
+        val d1 = "{\"session_id\":\"123abc\"}"
+        sendMessage("{\"op\":0,\"t\":\"READY\",\"s\":1,\"d\":$d1}", id) // Ready
+        val d2 = "{\"unavailable\": false,\"name\": \"Guild, Test\",\"channels\": " +
+            "[{\"name\":\"Test Channel\",\"id\":\"1234\"}],\"id\":\"789456123\"}"
+        sendMessage("{\"op\":0,\"t\":\"GUILD_CREATE\",\"s\":2,\"d\":$d2}", id) // Ready
     } else if (receivedText.contains("\"op\":6")) { // Resume
         if (lastDisconnectCode == CloseReason.Codes.GOING_AWAY) {
             sendMessage("{\"op\":9}", id) // invalid session
         } else {
             sendMessage("{\"op\":0,\"t\":\"RESUMED\",\"s\":8}", id) // Resumed
         }
-    } else {
-        val d = "{" +
-            "\"timestamp\":\"2022-04-08T23:11:07.123000+00:00\"," +
-            "\"mention_everyone\":false," +
-            "\"member\":{\"nick\": \"Nickname\"}," +
-            "\"id\":\"987654321\"," +
-            "\"content\":\"$receivedText\"," +
-            "\"channel_id\":\"1234\"," +
-            "\"author\":{\"username\":\"User\",\"discriminator\":\"0456\"}," +
-            "\"guild_id\":\"789456123\"" +
-            "}"
+    } else if (receivedText == "message" || receivedText == "message-empty") {
+        val content = if (receivedText == "message") "the message" else ""
+        val d = getMessageJson(content)
         sendMessage("{\"op\":0,\"t\":\"MESSAGE_CREATE\",\"d\":$d}", id) // message create
     }
+}
+
+private fun getMessageJson(content: String): String {
+    return "{" +
+        "\"timestamp\":\"2022-04-08T23:11:07.123000+00:00\"," +
+        "\"mention_everyone\":false," +
+        "\"member\":{\"nick\": \"Nickname\"}," +
+        "\"id\":\"987654321\"," +
+        "\"content\":\"$content\"," +
+        "\"channel_id\":\"1234\"," +
+        "\"author\":{\"username\":\"User\",\"discriminator\":\"0456\"}," +
+        "\"guild_id\":\"789456123\"" +
+    "}"
 }
 
 private suspend fun DefaultWebSocketServerSession.sendMessage(text: String, id: String) {

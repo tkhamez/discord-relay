@@ -22,6 +22,9 @@ Webhook:
 
 - If a message has been edited, it will currently not be relayed again.
 - Messages in threads will currently not be relayed.
+- The number of embeds that can be relayed is limited to 8, they do not include videos.
+- The channel and guild name in the footer of the relayed message does not contain commas or colons, they are replaced 
+  with a space if any are present.
 - There's a limit of 1000 connections (excluding resumes) withing 24 hours. The bot token will be invalidated if this 
   limit is exceeded. The app tries to keep track of this.
 - Read [this](https://support.discord.com/hc/en-us/articles/115002192352) and 

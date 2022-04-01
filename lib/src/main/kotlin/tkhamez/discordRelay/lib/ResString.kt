@@ -15,13 +15,13 @@ object ResString {
         private set
     var failedGatewayURL = "Failed to read gateway URL."
         private set
-    var sessionStartLimitReached = "Session start limit reached, try again in $1 milliseconds."
-        private set
-    var alreadyConnected = "Already connected, aborting."
+    var sessionStartLimitReached = "Session start limit reached, try again in $1 minutes."
         private set
     var connecting = "Connecting ..."
         private set
     var connected = "Connected."
+        private set
+    var closing = "Closing the connection ..."
         private set
     var disconnected = "Disconnected"
         private set
@@ -70,10 +70,10 @@ object ResString {
             requestingGatewayURL = "Abfragen der Gateway-URL ..."
             error = "Fehler: "
             failedGatewayURL = "Gateway-URL konnte nicht gelesen werden."
-            sessionStartLimitReached = "Sitzungsstartlimit erreicht, versuchen Sie es in $1 Millisekunden erneut."
-            alreadyConnected = "Bereits verbunden, Abbruch."
+            sessionStartLimitReached = "Sitzungsstartlimit erreicht, versuchen Sie es in $1 Minuten erneut."
             connecting = "Verbinden ..."
             connected = "Verbunden."
+            closing = "Schließen der Verbindung ..."
             disconnected = "Getrennt"
             errorConnection = "Verbindungsfehler: "
             reconnectAttempt = "Erneuter Verbindungsversuch in $1 Sekunden."

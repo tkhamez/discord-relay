@@ -2,6 +2,16 @@
 
 ## Changelog
 
+### v1.2.0, 2022-04-03
+
+- Added channel and guild name to the footer of the relayed message.
+- Messages in the GUI of the app are now selectable.
+- Reduced minimum width of left column.
+- Generally improved connection handling, hopefully.
+- Added rate limits for the Webhook.
+- Fix: Embeds and attachments were not always relayed.
+- Fix: Gateway was sometimes not properly closed.
+
 ### v1.1.0, 2022-03-30
 
 - Android: Prevent the WebSocket connection from sleeping via wake lock. This can significantly affect battery life.
