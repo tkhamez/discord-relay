@@ -2,6 +2,11 @@
 
 ## Changelog
 
+### v1.2.1, 2022-04-04
+
+- Fix for an endless disconnect/reconnect loop.
+- Android: Do not show toast twice on exit.
+
 ### v1.2.0, 2022-04-03
 
 - Added channel and guild name to the footer of the relayed message.

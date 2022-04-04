@@ -76,6 +76,7 @@ class Gateway(
     private var heartbeatJob: Job? = null
 
     private var retryJob: Job? = null
+    private var mayQueueRetry = false
     private var isClosed = true
 
     fun init() {
@@ -97,10 +98,7 @@ class Gateway(
     }
 
     fun close() {
-        if (retryJob?.isActive == true) {
-            messagesSend(ResString.reconnectAttemptCanceled)
-        }
-        retryJob?.cancel()
+        cancelRetryJob(true)
         if (webSocketSession?.isActive == true) {
             CoroutineScope(Dispatchers.IO).launch { close(CloseReason.Codes.NORMAL, CLOSE_REASON_MESSAGE_NORMAL) }
         } else {
@@ -209,7 +207,11 @@ class Gateway(
     private fun connect(url: String) {
         connectingOrConnected = true // here too for resume()
 
-        retryJob?.cancel() // for some reason connectionJob does not cancel retryJob
+        // Cancelling the connectionJob job below can lead to an exception which would call queueHandleClose()
+        // which results in an endless loop.
+        mayQueueRetry = false
+
+        cancelRetryJob(false)
         heartbeatJob?.cancel()
         webSocketSession?.cancel()
         connectionJob?.cancel()
@@ -217,6 +219,11 @@ class Gateway(
         messagesSend(ResString.connecting)
 
         connectionJob = CoroutineScope(Dispatchers.IO).launch {
+            // Delays a bit to make sure that the exception has been thrown before a new connection
+            // attempt is allowed to be queued.
+            delay(1000L)
+            mayQueueRetry = true
+
             try {
                 clientClosed = false
                 identifySent = false
@@ -230,9 +237,12 @@ class Gateway(
             } catch (t: Throwable) {
                 isClosed = true
                 messagesSend(ResString.errorConnection + t.message)
-                queueHandleClose()
+                if (mayQueueRetry) {
+                    queueHandleClose()
+                }
                 return@launch
             }
+
             webSocketSession?.let {
                 val reason = it.closeReason.await()
                 handleClose(reason)
@@ -261,7 +271,7 @@ class Gateway(
 
     private fun handleClose(reason: CloseReason? = null) {
         isClosed = true
-        retryJob?.cancel()
+        cancelRetryJob(false)
 
         val closeCode: Short = reason?.code ?: 0
         val closeMessage: String = reason?.message ?: ""
@@ -290,9 +300,9 @@ class Gateway(
             messagesSend(ResString.reconnectAttemptCanceled)
         }
 
-        retryJob?.cancel()
+        cancelRetryJob(false)
         if (tryResumeConnection) {
-            queueHandleClose() // handleClose() will not be called without Internet connection
+            queueHandleClose() // handleClose() will not be called without an internet connection
         }
 
         webSocketSession?.close(CloseReason(code, reason))
@@ -304,11 +314,18 @@ class Gateway(
     private fun queueHandleClose() {
         messagesSend(ResString.reconnectAttempt.replace("$1", retryTimeSec.toString()))
         trySendResume = false
-        retryJob?.cancel()
+        cancelRetryJob(false)
         retryJob = CoroutineScope(Dispatchers.IO).launch {
             delay(retryTimeSec * 1000)
             handleClose()
         }
+    }
+
+    private fun cancelRetryJob(withMessage: Boolean) {
+        if (withMessage && retryJob?.isActive == true) {
+            messagesSend(ResString.reconnectAttemptCanceled)
+        }
+        retryJob?.cancel()
     }
 
     private fun resumeTheConnection() {

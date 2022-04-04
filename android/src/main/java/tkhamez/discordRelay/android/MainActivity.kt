@@ -39,6 +39,7 @@ class MainActivity : AppCompatActivity() {
 
         if (backPressedTime + 2000 > System.currentTimeMillis()) {
             super.onBackPressed()
+            return
         }
         Toast.makeText(baseContext, getString(R.string.press_back), Toast.LENGTH_SHORT).show()
         backPressedTime = System.currentTimeMillis()
