@@ -1,7 +1,7 @@
 # Discord Relay
 
-An application for Linux, macOS, Windows (GUI and console) and Android to forward Discord messages from one Discord
-server to another.
+An application for Linux, macOS, Windows (each GUI and console) and Android to forward Discord messages from 
+one Discord server to another.
 
 ## Setup
 
@@ -26,7 +26,7 @@ Webhook:
 - Only embeds of the "rich" type were tested, without video or provider fields.
 - The channel and guild name in the footer of the relayed message does not contain commas or colons, they are replaced 
   with a space if any are present.
-- The channel ID fields can contain additional text at the end separated by a space.
+- The channel ID fields in the UI can contain additional text at the end separated by a space.
 - There's a limit of 1000 connections (excluding resumes) withing 24 hours. The bot token will be invalidated if this 
   limit is exceeded. The app tries to keep track of this.
 - Read [this](https://support.discord.com/hc/en-us/articles/115002192352) and 

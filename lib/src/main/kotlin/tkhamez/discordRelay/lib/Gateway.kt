@@ -40,7 +40,7 @@ private val httpClient = HttpClient(CIO) {
  * https://discord.com/developers/docs/topics/gateway
  * https://discord.com/developers/docs/topics/opcodes-and-status-codes
  */
-class Gateway(private val webhook: Webhook) {
+class Gateway {
     private val closeCodesReconnect = setOf<Short>(4000, 4001, 4002, 4003, 4005, 4007, 4008, 4009)
     private val closeCodesStop = setOf<Short>(4004, 4010, 4011, 4012, 4013, 4014)
 
@@ -517,7 +517,7 @@ class Gateway(private val webhook: Webhook) {
         } // foreach
     }
 
-    private suspend fun relayMessage(message: ChannelMessage) {
+    private fun relayMessage(message: ChannelMessage) {
         val channelIndex = Config.channelIds().indexOf(message.channel_id)
         val onlyMentionEveryone = Config.onlyMentionEveryone.getOrNull(channelIndex) ?: true
         if (channelIndex == -1 || (onlyMentionEveryone && message.mention_everyone != true)) {
@@ -525,6 +525,6 @@ class Gateway(private val webhook: Webhook) {
         }
 
         messagesSend(ResString.messageReceived)
-        webhook.sendMessage(message)
+        relayQueueSend(message)
     }
 }

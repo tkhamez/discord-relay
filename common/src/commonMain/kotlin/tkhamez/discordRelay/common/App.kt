@@ -32,6 +32,7 @@ import kotlin.math.min
 private var messagesJob: Job? = null
 private var eventsJob: Job? = null
 private var messagesTextInitial = ""
+private var configLoaded = false
 
 private const val LAYOUT_NARROW = 1
 private const val LAYOUT_WIDE = 2
@@ -47,8 +48,14 @@ fun App() {
     val language = getUserLanguage(androidContext)
     tkhamez.discordRelay.lib.ResString.setLanguage(language)
     ResString.setLanguage(language)
-    configLoad(androidContext)
 
+    // Only load once, not after each "onDestroy", e.g. after display was rotated.
+    if (!configLoaded) {
+        configLoad(androidContext)
+        configLoaded = true
+    }
+
+    getWebhook().launchJob()
     startEventListener(androidContext)
 
     // Text for column 2, needs to be outside BoxWithConstraints.
@@ -91,11 +98,9 @@ fun App() {
  * Only called on Android.
  */
 fun appOnDestroy() {
-    // Make sure the jobs are started again.
+    // Cancel job because messagesText will be initialized again
     messagesJob?.cancel()
-    eventsJob?.cancel()
     messagesJob = null
-    eventsJob = null
 
     // Reset cache or the displayed URL can be different from the used URL.
     Config.gatewayResponse = null
@@ -333,15 +338,20 @@ private fun configuration(context: Any?) {
                 apiBaseUrl = Config.apiBaseUrl
                 token = Config.token
                 isBotToken.value = Config.isBotToken
-                channelCount = 0 // Workaround to redraw channels: first set to 0 and then to it's correct value below.
+                // Workaround to redraw channels: set to a different number first
+                channelCount = if (channelCount == 0) {
+                        min(Config.channelIds.size, Config.onlyMentionEveryone.size)
+                    } else {
+                        0
+                    }
                 webhook = Config.webhook
             }
         ) {
             Text(ResString.load)
         }
-    }
-    if (channelCount == 0) {
-        channelCount = min(Config.channelIds.size, Config.onlyMentionEveryone.size)
+        if (channelCount == 0) {
+            channelCount = min(Config.channelIds.size, Config.onlyMentionEveryone.size)
+        }
     }
 }
 
@@ -411,8 +421,8 @@ private fun debugButtons() {
     Button(onClick = { gateway.testCloseResumeNOK() }) { Text("D close resume NOK") }
     Button(onClick = { gateway.testStopHeartbeat() }) { Text("D stop heartbeat") }
     Button(onClick = { gateway.testSend("message") }) { Text("D request: send message") }
-    Button(onClick = { gateway.testSend("close-1001") }) { Text("D request: close 1001") }
     Button(onClick = { gateway.testSend("message-empty") }) { Text("D request: send empty message") }
+    Button(onClick = { gateway.testSend("close-1001") }) { Text("D request: close 1001") }
     Button(onClick = { gateway.testSend("heartbeat") }) { Text("D request: request heartbeat") }
     Button(onClick = { gateway.testSend("heartbeat-no-ack") }) { Text("D no ACK next heartbeat") }
     Button(onClick = { gateway.testSend("invalid_ready") }) { Text("D request: invalid ready") }

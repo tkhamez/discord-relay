@@ -8,7 +8,7 @@ import io.ktor.client.features.json.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.utils.io.*
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.*
 
 private val httpClient = HttpClient(CIO) {
     install(JsonFeature)
@@ -22,9 +22,27 @@ private val httpClient = HttpClient(CIO) {
 class Webhook {
     private var lastException: ResponseException? = null
     private var lastRequest: Long = 0
-    private var requestsQueued: Long = 0
 
-    suspend fun sendMessage(channelMessage: ChannelMessage) {
+    private var job: Job? = null
+
+    fun launchJob() {
+        if (job?.isActive == true) {
+            return
+        }
+        job = CoroutineScope(Dispatchers.Default).launch {
+            while (isActive) {
+                val message = relayQueueReceive()
+                sendMessage(message)
+            }
+        }
+    }
+
+    suspend fun cancelAndJoinJob() {
+        job?.cancelAndJoin()
+        job = null
+    }
+
+    private suspend fun sendMessage(channelMessage: ChannelMessage) {
         if (Config.webhook.isEmpty()) {
             messagesSend(ResString.missingWebhook)
             return
@@ -36,9 +54,11 @@ class Webhook {
 
         val payload = HttpSendWebhook(
             username = channelMessage.member?.nick ?: channelMessage.author?.username,
-            avatar_url = if (channelMessage.author?.avatar != null)
-                "https://cdn.discordapp.com/avatars/${channelMessage.author.id}/${channelMessage.author.avatar}"
-                else null,
+            avatar_url = if (channelMessage.author?.avatar != null) {
+                    "https://cdn.discordapp.com/avatars/${channelMessage.author.id}/${channelMessage.author.avatar}"
+                } else {
+                    null
+                },
             content = replaceRoleIdInMention(channelMessage.content ?: ""),
             embeds = buildEmbedsFromMessage(channelMessage),
         )
@@ -84,14 +104,15 @@ class Webhook {
         httpMethod: HttpMethod = HttpMethod.Get,
         requestBody: Any? = null,
     ): T? {
-        // Very simple rate limit, max 1 request per second
-        if (lastRequest + (1000 * requestsQueued) + 1000 > System.currentTimeMillis()) {
-            requestsQueued++
-            log("Rate limit hit, requestsQueued: $requestsQueued")
-            delay(1000L * requestsQueued)
+        // Very simple rate limit for Webhook execute, max 1 request every 2 seconds.
+        if (httpMethod == HttpMethod.Post) {
+            val delay = 2000L
+            if (lastRequest + delay > System.currentTimeMillis()) {
+                log("Rate limit hit.")
+                delay(delay)
+            }
+            lastRequest = System.currentTimeMillis()
         }
-        lastRequest = System.currentTimeMillis()
-        requestsQueued = (requestsQueued - 1).coerceAtLeast(0)
 
         val result: T
         try {

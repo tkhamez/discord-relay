@@ -16,13 +16,15 @@ fun main() {
         exitProcess(0)
     }
 
-    getGateway().init()
+    getWebhook().launchJob()
 
     val messagesJob = CoroutineScope(Dispatchers.Default).launch {
         while (isActive) {
             log(messagesReceive())
         }
     }
+
+    getGateway().init()
 
     try {
         runBlocking {
@@ -31,6 +33,7 @@ fun main() {
                 if (event == EVENT_CLOSED) {
                     getGateway().close()
                     messagesJob.cancelAndJoin()
+                    getWebhook().cancelAndJoinJob()
                     this.cancel()
                 }
             }

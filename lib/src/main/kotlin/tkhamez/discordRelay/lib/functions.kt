@@ -8,9 +8,10 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 private var messages = Channel<String>(5000)
-private var events = Channel<Int>(100)
-
-private var gateway = Gateway(Webhook())
+private var events = Channel<Int>(10)
+private var relayQueue = Channel<ChannelMessage>(100)
+private var gateway = Gateway()
+private var webhook = Webhook()
 
 fun messagesSend(message: String) {
     CoroutineScope(Dispatchers.Default).launch { messages.send(message) }
@@ -30,8 +31,20 @@ suspend fun eventsReceive(): Int {
     return events.receive()
 }
 
+fun relayQueueSend(message: ChannelMessage) {
+    CoroutineScope(Dispatchers.Default).launch { relayQueue.send(message) }
+}
+
+suspend fun relayQueueReceive(): ChannelMessage {
+    return relayQueue.receive()
+}
+
 fun getGateway(): Gateway {
     return gateway
+}
+
+fun getWebhook(): Webhook {
+    return webhook
 }
 
 fun log(message: Any?) {
