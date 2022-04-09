@@ -22,9 +22,11 @@ Webhook:
 
 - If a message has been edited, it will currently not be relayed again.
 - Messages in threads will currently not be relayed.
-- The number of embeds that can be relayed is limited to 8, they do not include videos.
+- The number of embeds that can be relayed is limited to 8.
+- Only embeds of the "rich" type were tested, without video or provider fields.
 - The channel and guild name in the footer of the relayed message does not contain commas or colons, they are replaced 
   with a space if any are present.
+- The channel ID fields can contain additional text at the end separated by a space.
 - There's a limit of 1000 connections (excluding resumes) withing 24 hours. The bot token will be invalidated if this 
   limit is exceeded. The app tries to keep track of this.
 - Read [this](https://support.discord.com/hc/en-us/articles/115002192352) and 
@@ -45,7 +47,8 @@ The console app is configured with environment variables:
 - `DISCORD_RELAY_TOKEN` Required
 - `DISCORD_RELAY_IS_BOT_TOKEN` 1 or 0, optional, default: 1
 - `DISCORD_RELAY_CHANNEL_IDS` Comma separated list of channel IDs
-- `DISCORD_RELAY_ONLY_MENTION_EVERYONE` 1 or 0, optional, default: 1
+- `DISCORD_RELAY_ONLY_MENTION_EVERYONE` Comma separated list of 1 or 0, position according to the channels 
+  in DISCORD_RELAY_CHANNEL_IDS, optional, default: 1
 - `DISCORD_RELAY_WEBHOOK`
 
 If the app crashes on macOS, try:

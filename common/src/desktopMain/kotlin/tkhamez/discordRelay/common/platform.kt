@@ -33,8 +33,12 @@ actual fun saveConfig(context: Any?, config: Config) {
     prefs.put(CONFIG_API_BASE_URL, config.apiBaseUrl)
     prefs.put(CONFIG_TOKEN, config.token)
     prefs.put(CONFIG_IS_BOT_TOKEN, if (config.isBotToken) "1" else "0")
-    prefs.put(CONFIG_CHANNEL_IDS, config.channelIds)
-    prefs.put(CONFIG_ONLY_MENTION_EVERYONE, if (config.onlyMentionEveryone) "1" else "0")
+    prefs.put(CONFIG_CHANNEL_IDS, config.channelIds.joinToString(","))
+    val onlyMentionEveryone = mutableListOf<String>()
+    config.onlyMentionEveryone.forEach {
+        onlyMentionEveryone.add(if (it) "1" else "0")
+    }
+    prefs.put(CONFIG_ONLY_MENTION_EVERYONE, onlyMentionEveryone.joinToString(","))
     prefs.put(CONFIG_WEBHOOK, config.webhook)
 }
 
@@ -45,8 +49,11 @@ actual fun loadConfig(context: Any?, config: Config) {
     }
     config.token = prefs.get(CONFIG_TOKEN, "")
     config.isBotToken = prefs.get(CONFIG_IS_BOT_TOKEN, "1") == "1"
-    config.channelIds = prefs.get(CONFIG_CHANNEL_IDS, "")
-    config.onlyMentionEveryone = prefs.get(CONFIG_ONLY_MENTION_EVERYONE, "1") == "1"
+    config.channelIds = prefs.get(CONFIG_CHANNEL_IDS, "").split(",").toMutableList()
+    config.onlyMentionEveryone.clear()
+    prefs.get(CONFIG_ONLY_MENTION_EVERYONE, "1").split(",").forEach {
+        config.onlyMentionEveryone.add(it == "1")
+    }
     config.webhook = prefs.get(CONFIG_WEBHOOK, "")
 }
 

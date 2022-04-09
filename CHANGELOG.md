@@ -2,6 +2,28 @@
 
 ## Changelog
 
+### v1.3.0, 2022-04-09
+
+Features:
+- Each channel now has its own "@everyone" setting. `DISCORD_RELAY_ONLY_MENTION_EVERYONE` is now a 
+  comma separated list.
+
+UI:
+- The new channel ID fields can contain additional text at the end separated by a space.
+- General UI improvements.
+
+Relayed message:
+- The footer of the message now shows whether the author is a bot.
+- Messages now use the original avatar, if available.
+- Messages now use the author's username if the member's nickname is not available.
+- Message embeds now also include the color and the footer icon of the original message.
+- @deleted-role is now replaced with `@Role name` in the message content.
+
+Other:
+- Fix: The time of a message is now the time it was created, not the time it was displayed.
+- Change: Exit the console program if the websocket connection cannot be restored.
+- Added an example systemd service unit file for the console program.
+
 ### v1.2.1, 2022-04-04
 
 - Fix for an endless disconnect/reconnect loop.

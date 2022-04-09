@@ -58,6 +58,12 @@ fun main() {
                     checkHeartbeat(id)
                 }
 
+                /*CoroutineScope(Dispatchers.IO).launch {
+                    delay(4000)
+                    //close(CloseReason(4000, ""))
+                    close(CloseReason(4014, ""))
+                }*/
+
                 for (frame in incoming) {
                     frame as? Frame.Text ?: continue
                     handleMessage(frame.readText(), id)
@@ -110,8 +116,9 @@ private suspend fun DefaultWebSocketServerSession.handleMessage(receivedText: St
         remaining --
         val d1 = "{\"session_id\":\"123abc\"}"
         sendMessage("{\"op\":0,\"t\":\"READY\",\"s\":1,\"d\":$d1}", id) // Ready
-        val d2 = "{\"unavailable\": false,\"name\": \"Guild, Test\",\"channels\": " +
-            "[{\"name\":\"Test Channel\",\"id\":\"1234\"}],\"id\":\"789456123\"}"
+        val d2 = "{\"id\":\"789456123\", \"name\": \"Guild, Test\", \"unavailable\": false, " +
+            "\"channels\": [{\"id\": \"1234\", \"name\": \"Test Channel\"}], " +
+            "\"roles\": [{\"id\": \"4567\", \"name\": \"Test Role\"}, {\"id\": \"7890\", \"name\": \"Role2\"}]}"
         sendMessage("{\"op\":0,\"t\":\"GUILD_CREATE\",\"s\":2,\"d\":$d2}", id) // Ready
     } else if (receivedText.contains("\"op\":6")) { // Resume
         if (lastDisconnectCode == CloseReason.Codes.GOING_AWAY) {
@@ -120,7 +127,7 @@ private suspend fun DefaultWebSocketServerSession.handleMessage(receivedText: St
             sendMessage("{\"op\":0,\"t\":\"RESUMED\",\"s\":8}", id) // Resumed
         }
     } else if (receivedText == "message" || receivedText == "message-empty") {
-        val content = if (receivedText == "message") "the message" else ""
+        val content = if (receivedText == "message") "<@&4567>the message <@2656> <@&7890>" else ""
         val d = getMessageJson(content)
         sendMessage("{\"op\":0,\"t\":\"MESSAGE_CREATE\",\"d\":$d}", id) // message create
     }
@@ -144,8 +151,7 @@ private suspend fun DefaultWebSocketServerSession.sendMessage(text: String, id: 
     send(text)
 }
 
-@Suppress("SimpleDateFormat")
 private fun log(message: Any?) {
-    val now = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").format(Date())
+    val now = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.getDefault()).format(Date())
     println("$now $message")
 }

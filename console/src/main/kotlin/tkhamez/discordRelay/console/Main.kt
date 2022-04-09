@@ -1,7 +1,6 @@
 package tkhamez.discordRelay.console
 
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.*
 import tkhamez.discordRelay.lib.*
 import kotlin.system.exitProcess
 
@@ -18,10 +17,25 @@ fun main() {
     }
 
     getGateway().init()
-    runBlocking {
+
+    val messagesJob = CoroutineScope(Dispatchers.Default).launch {
         while (isActive) {
             log(messagesReceive())
         }
+    }
+
+    try {
+        runBlocking {
+            while (isActive) {
+                val event = eventsReceive()
+                if (event == EVENT_CLOSED) {
+                    getGateway().close()
+                    messagesJob.cancelAndJoin()
+                    this.cancel()
+                }
+            }
+        }
+    } catch (_: CancellationException) {
     }
 }
 
@@ -37,8 +51,10 @@ private fun readConfig(): Boolean {
     }
     Config.token = token
     Config.isBotToken = System.getenv("DISCORD_RELAY_IS_BOT_TOKEN") == "1"
-    Config.channelIds = System.getenv("DISCORD_RELAY_CHANNEL_IDS") + ""
-    Config.onlyMentionEveryone = System.getenv("DISCORD_RELAY_ONLY_MENTION_EVERYONE") == "1"
+    Config.channelIds = (System.getenv("DISCORD_RELAY_CHANNEL_IDS") + "").split(",").toMutableList()
+    (System.getenv("DISCORD_RELAY_ONLY_MENTION_EVERYONE") ?: "").split(",").forEach {
+        Config.onlyMentionEveryone.add(it == "1")
+    }
     Config.webhook = System.getenv("DISCORD_RELAY_WEBHOOK") + ""
 
     return true

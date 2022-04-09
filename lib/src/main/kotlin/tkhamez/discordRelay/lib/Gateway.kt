@@ -10,7 +10,6 @@ import io.ktor.client.features.websocket.*
 import io.ktor.client.request.*
 import io.ktor.http.cio.websocket.*
 import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.Channel
 
 /**
  * Send when the connection is closed and there will be no attempt to reconnect.
@@ -41,11 +40,7 @@ private val httpClient = HttpClient(CIO) {
  * https://discord.com/developers/docs/topics/gateway
  * https://discord.com/developers/docs/topics/opcodes-and-status-codes
  */
-class Gateway(
-    private val messages: Channel<String>,
-    private val events: Channel<Int>,
-    private val webhook: Webhook,
-) {
+class Gateway(private val webhook: Webhook) {
     private val closeCodesReconnect = setOf<Short>(4000, 4001, 4002, 4003, 4005, 4007, 4008, 4009)
     private val closeCodesStop = setOf<Short>(4004, 4010, 4011, 4012, 4013, 4014)
 
@@ -135,7 +130,7 @@ class Gateway(
             if (!fetchGatewayUrl()) {
                 connectingOrConnected = false
                 // need to send this for Android to stop the service
-                eventsSendClosed()
+                eventsSend(EVENT_CLOSED)
                 return@launch
             }
 
@@ -289,7 +284,7 @@ class Gateway(
         } else if (!tryResumeConnection) {
             sessionId = null
             connectingOrConnected = false
-            eventsSendClosed()
+            eventsSend(EVENT_CLOSED)
         }
         tryResumeConnection = false
     }
@@ -339,7 +334,7 @@ class Gateway(
         } ?: run {
             connectingOrConnected = false
             messagesSend(ResString.cannotResume)
-            eventsSendClosed()
+            eventsSend(EVENT_CLOSED)
         }
     }
 
@@ -392,7 +387,7 @@ class Gateway(
                 if (messageReady.session_id != null) {
                     sessionId = messageReady.session_id
                     messagesSend(ResString.ready)
-                    storeChannelInfo(messageReady.guilds)
+                    storeGuildInfo(messageReady.guilds)
                 } else {
                     messagesSend(ResString.readyError)
                     tryResumeConnection = true
@@ -400,7 +395,7 @@ class Gateway(
                 }
             } else if (message.t == EVENT_GUILD_CREATE) {
                 val messageGuildCreate = gson.fromJson(gson.toJson(message.d), DiscordGuild::class.java)
-                storeChannelInfo(listOf(messageGuildCreate))
+                storeGuildInfo(listOf(messageGuildCreate))
             } else if (message.t == EVENT_RESUMED) {
                 messagesSend(ResString.connectionResumed)
             } else if (message.t == EVENT_MESSAGE_CREATE) {
@@ -491,40 +486,45 @@ class Gateway(
         send(Gson().toJson(resume))
     }
 
-    private fun storeChannelInfo(guilds: List<DiscordGuild>?) {
+    private fun storeGuildInfo(guilds: List<DiscordGuild>?) {
         if (guilds == null) {
             return
         }
+
         for (guild in guilds) {
-            if (guild.unavailable == true || guild.channels == null) {
+            if (guild.unavailable == true) {
                 continue
             }
+
             val tmpGuild = DiscordGuild(id = guild.id, name = guild.name)
-            for (channel in guild.channels) {
-                if (Config.channelIdList().contains(channel.id)) {
-                    Config.channels.add(GuildChannel(id = channel.id, name = channel.name, guild = tmpGuild))
+
+            // Channels
+            if (guild.channels != null) {
+                for (channel in guild.channels) {
+                    if (Config.channelIds().contains(channel.id)) {
+                        Config.guildChannels.add(GuildObject(id = channel.id, name = channel.name, guild = tmpGuild))
+                    }
                 }
             }
-        }
+
+            // Roles
+            if (guild.roles != null) {
+                for (role in guild.roles) {
+                    Config.guildRoles.add(GuildObject(id = role.id, name = role.name, guild = tmpGuild))
+                }
+            }
+
+        } // foreach
     }
 
     private suspend fun relayMessage(message: ChannelMessage) {
-        if (
-            !Config.channelIdList().contains(message.channel_id) ||
-            (Config.onlyMentionEveryone && message.mention_everyone != true)
-        ) {
+        val channelIndex = Config.channelIds().indexOf(message.channel_id)
+        val onlyMentionEveryone = Config.onlyMentionEveryone.getOrNull(channelIndex) ?: true
+        if (channelIndex == -1 || (onlyMentionEveryone && message.mention_everyone != true)) {
             return
         }
 
         messagesSend(ResString.messageReceived)
         webhook.sendMessage(message)
-    }
-
-    private fun messagesSend(message: String) {
-        CoroutineScope(Dispatchers.Default).launch { messages.send(message) }
-    }
-
-    private fun eventsSendClosed() {
-        CoroutineScope(Dispatchers.Default).launch { events.send(EVENT_CLOSED) }
     }
 }

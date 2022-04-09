@@ -4,6 +4,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -13,6 +14,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.Placeholder
 import androidx.compose.ui.text.PlaceholderVerticalAlign
 import androidx.compose.ui.text.buildAnnotatedString
@@ -25,8 +27,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flow
 import tkhamez.discordRelay.lib.*
-import java.text.SimpleDateFormat
-import java.util.*
+import kotlin.math.min
 
 private var messagesJob: Job? = null
 private var eventsJob: Job? = null
@@ -46,7 +47,7 @@ fun App() {
     val language = getUserLanguage(androidContext)
     tkhamez.discordRelay.lib.ResString.setLanguage(language)
     ResString.setLanguage(language)
-    loadConfig(androidContext, Config)
+    configLoad(androidContext)
 
     startEventListener(androidContext)
 
@@ -101,6 +102,11 @@ fun appOnDestroy() {
     Config.gatewayResponseBot = mutableMapOf()
 }
 
+private fun configLoad(androidContext: Any?) {
+    loadConfig(androidContext, Config)
+    Config.sanitize()
+}
+
 private fun startEventListener(context: Any?) {
     if (eventsJob?.isActive == true) {
         return
@@ -117,9 +123,7 @@ private fun startEventListener(context: Any?) {
 
 private fun startMessageListener(): Flow<String> = flow {
     while (true) {
-        val message = messagesReceive()
-        val now = SimpleDateFormat("HH:mm:ss").format(Date())
-        emit("$now $message")
+        emit(messagesReceive())
     }
 }
 
@@ -180,6 +184,9 @@ private fun cardHeadline(test: String) {
 
 @Composable
 private fun configuration(context: Any?) {
+    cardHeadline(ResString.configuration)
+
+    // API URL + reset button
     var apiBaseUrl by remember { mutableStateOf(Config.apiBaseUrl) }
     fun updateApiBaseUrl(url: String) {
         apiBaseUrl = url
@@ -187,24 +194,26 @@ private fun configuration(context: Any?) {
         Config.gatewayResponse = null
         Config.gatewayResponseBot = mutableMapOf()
     }
-
-    cardHeadline(ResString.configuration)
-
     TextField(
         value = apiBaseUrl,
         onValueChange = { updateApiBaseUrl(it) },
         label = { Text(ResString.apiBaseUrl) },
         singleLine = true,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().padding(0.dp, 12.dp, 0.dp, 0.dp),
     )
     Button(
         onClick = { updateApiBaseUrl(Config.apiBaseUrlDefault) },
-        modifier = Modifier.defaultMinSize(minWidth = 1.dp, minHeight = 1.dp),
-        contentPadding = PaddingValues(4.dp, 4.dp)
+        colors = ButtonDefaults.buttonColors(backgroundColor = MaterialTheme.colors.secondary),
+        modifier = Modifier
+            .defaultMinSize(minWidth = 1.dp, minHeight = 1.dp)
+            .padding(0.dp, 6.dp, 0.dp, 12.dp)
+            .height(22.dp),
+        contentPadding = PaddingValues(4.dp, 4.dp),
     ) {
         Text(ResString.resetURL, fontSize = 10.sp)
     }
 
+    // Token + checkbox
     var token by remember { mutableStateOf(Config.token) }
     TextField(
         value = token,
@@ -214,7 +223,7 @@ private fun configuration(context: Any?) {
         },
         label = { Text(ResString.token) },
         singleLine = true,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().padding(0.dp, 12.dp, 0.dp, 0.dp),
     )
     val isBotToken = remember { mutableStateOf(Config.isBotToken) }
     Row {
@@ -225,32 +234,81 @@ private fun configuration(context: Any?) {
                 Config.isBotToken = it
             },
         )
-        Text(ResString.isBotToken, Modifier.padding(12.dp))
-    }
-
-    var channelIds by remember { mutableStateOf(Config.channelIds) }
-    TextField(
-        value = channelIds,
-        onValueChange = {
-            channelIds = it
-            Config.channelIds = it
-        },
-        label = { Text(ResString.channelIds) },
-        singleLine = true,
-        modifier = Modifier.fillMaxWidth(),
-    )
-    val onlyMentionEveryone = remember { mutableStateOf(Config.onlyMentionEveryone) }
-    Row {
-        Checkbox(
-            checked = onlyMentionEveryone.value,
-            onCheckedChange = {
-                onlyMentionEveryone.value = it
-                Config.onlyMentionEveryone = it
+        ClickableText(
+            text = AnnotatedString(ResString.isBotToken),
+            onClick = {
+                isBotToken.value = !isBotToken.value
+                Config.isBotToken = isBotToken.value
             },
+            modifier = Modifier.padding(0.dp, 15.dp, 0.dp, 0.dp),
         )
-        Text(ResString.onlyMentionEveryone, Modifier.padding(12.dp))
     }
 
+    // Channels + add and remove buttons
+    var channelCount by remember { mutableStateOf (min(Config.channelIds.size, Config.onlyMentionEveryone.size)) }
+    repeat(channelCount) { channelIndex ->
+        var channelId by remember { mutableStateOf(Config.channelIds[channelIndex]) }
+        TextField(
+            value = channelId,
+            onValueChange = {
+                channelId = it
+                Config.channelIds[channelIndex] = it
+            },
+            label = { Text(ResString.channelId) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth().padding(0.dp, 12.dp, 0.dp, 0.dp),
+        )
+        val onlyMentions = remember { mutableStateOf(Config.onlyMentionEveryone[channelIndex]) }
+        Row {
+            Checkbox(
+                checked = onlyMentions.value,
+                onCheckedChange = {
+                    onlyMentions.value = it
+                    Config.onlyMentionEveryone[channelIndex] = it
+                },
+            )
+            ClickableText(
+                text = AnnotatedString(ResString.onlyMentionEveryone),
+                onClick = {
+                    onlyMentions.value = !onlyMentions.value
+                    Config.isBotToken = onlyMentions.value
+                },
+                modifier = Modifier.padding(0.dp, 15.dp, 0.dp, 0.dp),
+            )
+        }
+    }
+    Row {
+        Button(
+            onClick = {
+                Config.channelIds.add("")
+                Config.onlyMentionEveryone.add(true)
+                channelCount++
+            },
+            colors = ButtonDefaults.buttonColors(backgroundColor = MaterialTheme.colors.secondary),
+            modifier = Modifier.defaultMinSize(minWidth = 1.dp, minHeight = 1.dp),
+            contentPadding = PaddingValues(6.dp, 6.dp),
+        ) {
+            Text(ResString.addChannel, fontSize = 12.sp)
+        }
+        Button(
+            onClick = {
+                if (channelCount > 0) {
+                    channelCount--
+                    Config.channelIds.removeAt(channelCount)
+                    Config.onlyMentionEveryone.removeAt(channelCount)
+                }
+            },
+            colors = ButtonDefaults.buttonColors(backgroundColor = MaterialTheme.colors.secondary),
+            modifier = Modifier
+                .padding(4.dp, 0.dp, 0.dp, 0.dp)
+                .defaultMinSize(minWidth = 1.dp, minHeight = 1.dp),
+            contentPadding = PaddingValues(6.dp, 6.dp),
+        ) {
+            Text(ResString.removeChannel, fontSize = 12.sp)
+        }
+    }
+
+    // Webhook
     var webhook by remember { mutableStateOf(Config.webhook) }
     TextField(
         value = webhook,
@@ -260,29 +318,30 @@ private fun configuration(context: Any?) {
         },
         label = { Text(ResString.webhook) },
         singleLine = true,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().padding(0.dp, 12.dp, 0.dp, 0.dp),
     )
 
-    Row {
-        Button(
-            onClick = { saveConfig(context, Config) }
-        ) {
+    // Save and load buttons
+    Row(modifier = Modifier.padding(0.dp, 12.dp, 0.dp, 0.dp)) {
+        Button(onClick = { saveConfig(context, Config) }) {
             Text(ResString.save)
         }
         Button(
             modifier = Modifier.padding(4.dp, 0.dp, 0.dp, 0.dp),
             onClick = {
-                loadConfig(context, Config)
+                configLoad(context)
                 apiBaseUrl = Config.apiBaseUrl
                 token = Config.token
                 isBotToken.value = Config.isBotToken
-                channelIds = Config.channelIds
-                onlyMentionEveryone.value = Config.onlyMentionEveryone
+                channelCount = 0 // Workaround to redraw channels: first set to 0 and then to it's correct value below.
                 webhook = Config.webhook
             }
         ) {
             Text(ResString.load)
         }
+    }
+    if (channelCount == 0) {
+        channelCount = min(Config.channelIds.size, Config.onlyMentionEveryone.size)
     }
 }
 
@@ -291,9 +350,7 @@ private fun gateway(context: Any?) {
     cardHeadline(ResString.gateway)
 
     Row {
-        Button(
-            onClick = { startGateway(context) },
-        ) {
+        Button(onClick = { startGateway(context) }) {
             Text(ResString.connect)
         }
         Button(

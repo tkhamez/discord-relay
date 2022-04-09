@@ -13,9 +13,13 @@ object ResString {
         private set
     var isBotToken = "Is a bot token"
         private set
-    var channelIds = "Channel IDs (comma separated)"
+    var channelId = "Channel ID"
         private set
     var onlyMentionEveryone = "Only @everyone, @here"
+        private set
+    var addChannel = "Add channel"
+        private set
+    var removeChannel = "Remove channel"
         private set
     var save = "Save"
         private set
@@ -39,8 +43,10 @@ object ResString {
             apiBaseUrl = "API-Basis-URL"
             resetURL = "URL zurücksetzen"
             isBotToken = "Ist ein Bot-Token"
-            channelIds = "Kanal IDs (kommasepariert)"
+            channelId = "Kanal ID"
             onlyMentionEveryone = "Nur @everyone, @here"
+            addChannel = "Kanal hinzufügen"
+            removeChannel = "Kanal entfernen"
             save = "Speichern"
             load = "Laden"
             connect = "Verbinden"

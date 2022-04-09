@@ -12,17 +12,19 @@ data class HttpResponseGatewaySession(
     val max_concurrency: Int? = null,
 )
 
+// https://discord.com/developers/docs/resources/webhook#execute-webhook-jsonform-params
 data class HttpSendWebhook(
-    val username: String? = null,
     val content: String? = null,
+    val username: String? = null,
+    val avatar_url: String? = null,
     val embeds: List<ChannelMessageEmbed>? = null,
 )
 
 data class WebSocketReceiveMessage(
-    val t: Any? = null, // gateway event name
+    val t: Any? = null, // Gateway event name
     val op: Int? = null, // Opcode
     val s: Int? = null, // Sequence number
-    val d: Any? = null, // data
+    val d: Any? = null, // Data
 )
 
 data class WebSocketReceiveHello(val heartbeat_interval: Long? = null)
@@ -42,46 +44,58 @@ data class WebSocketSendIdentifyDataProperties(val `$os`: String, val `$browser`
 data class WebSocketSendResume(val op: Int, val d: WebSocketSendResumeData)
 data class WebSocketSendResumeData(val token: String, val session_id: String, val seq: Int?)
 
+// https://discord.com/developers/docs/resources/guild#unavailable-guild-object
+// https://discord.com/developers/docs/resources/guild#guild-object
 data class DiscordGuild(
-    val unavailable: Boolean? = null,
     val id: String? = null,
     val name: String? = null,
-    val channels: List<GuildChannel>? = null,
+    val unavailable: Boolean? = null,
+    val roles: List<GuildObject>? = null,
+    val channels: List<GuildObject>? = null,
 )
 
-data class GuildChannel(
+data class GuildObject(
     val id: String? = null,
     val name: String? = null,
     val guild: DiscordGuild? = null,
 )
 
+// https://discord.com/developers/docs/resources/channel#message-object
 data class ChannelMessage(
+    val id: String? = null,
+    val channel_id: String? = null,
+    val guild_id: String? = null,
+    val author: ChannelMessageAuthor? = null,
+    val member: ChannelMessageMember? = null,
+    var content: String? = null,
     val timestamp: String? = null,
     val mention_everyone: Boolean? = null,
-    val member: ChannelMessageMember? = null,
-    val id: String? = null,
-    var content: String? = null,
-    val channel_id: String? = null,
-    val author: ChannelMessageAuthor? = null,
-    val guild_id: String? = null,
     var attachments: List<ChannelMessageAttachment>? = null,
     var embeds: List<ChannelMessageEmbed>? = null,
 )
+data class ChannelMessageAuthor(
+    val id: String? = null,
+    val username: String? = null,
+    val discriminator: String? = null,
+    val avatar: String? = null,
+    val bot: Boolean? = null,
+)
 data class ChannelMessageMember(val nick: String? = null)
-data class ChannelMessageAuthor(val username: String? = null, val discriminator: String? = null)
 data class ChannelMessageAttachment(val url: String? = null, val filename: String? = null)
 
+// https://discord.com/developers/docs/resources/channel#embed-object
 data class ChannelMessageEmbed(
     val title: String? = null,
-    val url: String? = null,
-    val author: ChannelMessageEmbedAuthor? = null,
     val description: String? = null,
-    val fields: List<ChannelMessageEmbedField>? = null,
+    val url: String? = null,
+    val color: Int? = null,
+    val footer: ChannelMessageEmbedFooter? = null,
     val image: ChannelMessageEmbedURL? = null,
     val thumbnail: ChannelMessageEmbedURL? = null,
-    val footer: ChannelMessageEmbedFooter? = null,
+    val author: ChannelMessageEmbedAuthor? = null,
+    val fields: List<ChannelMessageEmbedField>? = null,
 )
+data class ChannelMessageEmbedFooter(val text: String? = null, val icon_url: String? = null)
+data class ChannelMessageEmbedURL(val url: String? = null)
 data class ChannelMessageEmbedAuthor(val name: String? = null, val url: String? = null, val icon_url: String? = null)
 data class ChannelMessageEmbedField(val name: String? = null, val value: String? = null, val inline: Boolean = false)
-data class ChannelMessageEmbedURL(val url: String? = null)
-data class ChannelMessageEmbedFooter(val text: String? = null)

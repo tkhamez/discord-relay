@@ -8,11 +8,7 @@ import io.ktor.client.features.json.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.utils.io.*
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 private val httpClient = HttpClient(CIO) {
     install(JsonFeature)
@@ -23,8 +19,7 @@ private val httpClient = HttpClient(CIO) {
  * https://discord.com/developers/docs/resources/channel
  * https://discord.com/developers/docs/topics/rate-limits
  */
-class Webhook(private val messages: Channel<String>) {
-
+class Webhook {
     private var lastException: ResponseException? = null
     private var lastRequest: Long = 0
     private var requestsQueued: Long = 0
@@ -40,8 +35,11 @@ class Webhook(private val messages: Channel<String>) {
         }
 
         val payload = HttpSendWebhook(
-            username = channelMessage.member?.nick,
-            content = channelMessage.content,
+            username = channelMessage.member?.nick ?: channelMessage.author?.username,
+            avatar_url = if (channelMessage.author?.avatar != null)
+                "https://cdn.discordapp.com/avatars/${channelMessage.author.id}/${channelMessage.author.avatar}"
+                else null,
+            content = replaceRoleIdInMention(channelMessage.content ?: ""),
             embeds = buildEmbedsFromMessage(channelMessage),
         )
 
@@ -119,6 +117,22 @@ class Webhook(private val messages: Channel<String>) {
         return result
     }
 
+    private fun replaceRoleIdInMention(content: String): String {
+        var result = content
+        val roleIds = Regex("""<@&(\d+)>""").findAll(content)
+            .map { it.groups[1]!!.value }
+            .toList()
+        for (roleId in roleIds) {
+            for (role in Config.guildRoles) {
+                if (role.id == roleId) {
+                    result = result.replace("<@&$roleId>", "`@${role.name}`")
+                    break
+                }
+            }
+        }
+        return result
+    }
+
     private fun buildEmbedsFromMessage(channelMessage: ChannelMessage): MutableList<ChannelMessageEmbed> {
         val embeds = mutableListOf<ChannelMessageEmbed>()
 
@@ -138,15 +152,22 @@ class Webhook(private val messages: Channel<String>) {
             embeds.add(ChannelMessageEmbed(title = "Attachments", fields = attachmentsFields))
         }
 
-        // Footer
-        val user = channelMessage.author?.username + "#" + channelMessage.author?.discriminator
+        // Add footer
+        var user = channelMessage.author?.username
+        if ((channelMessage.author?.discriminator ?: "0000") != "0000") {
+            user += "#" + channelMessage.author?.discriminator
+        }
+        if (channelMessage.author?.bot == true) {
+            user += " (bot)"
+        }
         val time = channelMessage.timestamp?.replace("T", " ")?.substring(0, 19)
         var channelName = ""
         var guildName = ""
-        Config.channels.forEach {
+        Config.guildChannels.forEach {
             if (it.id == channelMessage.channel_id) {
                 channelName = it.name.toString().replace(',', ' ').replace(':', ' ')
                 guildName = it.guild?.name.toString().replace(',', ' ').replace(':', ' ')
+                return@forEach
             }
         }
         val footer = ChannelMessageEmbed(
@@ -159,9 +180,5 @@ class Webhook(private val messages: Channel<String>) {
         embeds.add(footer)
 
         return embeds
-    }
-
-    private fun messagesSend(message: String) {
-        CoroutineScope(Dispatchers.Default).launch { messages.send(message) }
     }
 }

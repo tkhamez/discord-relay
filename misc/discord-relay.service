@@ -1,0 +1,17 @@
+# /etc/systemd/system/discord-relay.service
+
+[Unit]
+Description=Discord Relay
+After=network.target
+
+[Service]
+EnvironmentFile=/home/ubuntu/.discord-relay.conf
+User=ubuntu
+Group=ubuntu
+ExecStart=/home/ubuntu/DiscordRelay/bin/DiscordRelay
+StandardOutput=append:/var/log/discord-relay.log
+StandardError=append:/var/log/discord-relay.log
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
