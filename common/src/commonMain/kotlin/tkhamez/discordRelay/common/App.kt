@@ -24,7 +24,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flow
 import tkhamez.discordRelay.lib.*
 import kotlin.math.min
@@ -77,17 +76,17 @@ fun App() {
         val width = maxWidth
         Column {
             if (androidContext != null) {
-                addHeadlineWithLogo()
+                AddHeadlineWithLogo()
             }
             if (width < 600.dp) {
                 Column {
-                    scrollableColumn(CONTENT_COL1, LAYOUT_NARROW, androidContext, messagesText)
-                    scrollableColumn(CONTENT_COL2, LAYOUT_NARROW, androidContext, messagesText)
+                    ScrollableColumn(CONTENT_COL1, LAYOUT_NARROW, androidContext, messagesText)
+                    ScrollableColumn(CONTENT_COL2, LAYOUT_NARROW, androidContext, messagesText)
                 }
             } else {
                 Row {
-                    scrollableColumn(CONTENT_COL1, LAYOUT_WIDE, androidContext, messagesText)
-                    scrollableColumn(CONTENT_COL2, LAYOUT_WIDE, androidContext, messagesText)
+                    ScrollableColumn(CONTENT_COL1, LAYOUT_WIDE, androidContext, messagesText)
+                    ScrollableColumn(CONTENT_COL2, LAYOUT_WIDE, androidContext, messagesText)
                 }
             }
         }
@@ -133,7 +132,7 @@ private fun startMessageListener(): Flow<String> = flow {
 }
 
 @Composable
-private fun scrollableColumn(content: Int, layout: Int, context: Any?, messages: String) {
+private fun ScrollableColumn(content: Int, layout: Int, context: Any?, messages: String) {
     Box(
         modifier = Modifier.fillMaxHeight(if (content == CONTENT_COL1 && layout == LAYOUT_NARROW) 0.7f else 1f)
     ) {
@@ -146,12 +145,12 @@ private fun scrollableColumn(content: Int, layout: Int, context: Any?, messages:
         ) {
             when (content) {
                 CONTENT_COL1 -> {
-                    card(CONTENT_GATEWAY, context)
-                    card(CONTENT_CONFIG, context)
-                    //debugButtons()
+                    Card(CONTENT_GATEWAY, context)
+                    Card(CONTENT_CONFIG, context)
+                    //DebugButtons()
                 }
                 CONTENT_COL2 -> {
-                    card(CONTENT_MESSAGES, messages = messages, backgroundColor = Color.LightGray)
+                    Card(CONTENT_MESSAGES, messages = messages, backgroundColor = Color.LightGray)
                 }
             }
         }
@@ -160,7 +159,7 @@ private fun scrollableColumn(content: Int, layout: Int, context: Any?, messages:
 }
 
 @Composable
-private fun card(content: Int, context: Any? = null, messages: String? = null, backgroundColor: Color = Color.White) {
+private fun Card(content: Int, context: Any? = null, messages: String? = null, backgroundColor: Color = Color.White) {
     Card(
         modifier = Modifier.fillMaxWidth().padding(4.dp),
         elevation = 4.dp
@@ -169,18 +168,18 @@ private fun card(content: Int, context: Any? = null, messages: String? = null, b
             modifier = Modifier.background(backgroundColor).padding(4.dp)
         ) {
             when (content) {
-                CONTENT_CONFIG -> { configuration(context) }
-                CONTENT_GATEWAY -> { gateway(context) }
-                CONTENT_MESSAGES -> { messages(messages.toString()) }
+                CONTENT_CONFIG -> { Configuration(context) }
+                CONTENT_GATEWAY -> { Gateway(context) }
+                CONTENT_MESSAGES -> { Messages(messages.toString()) }
             }
         }
     }
 }
 
 @Composable
-private fun cardHeadline(test: String) {
+private fun CardHeadline(text: String) {
     Text(
-        test,
+        text,
         fontSize = 14.sp,
         fontWeight = FontWeight.Bold,
         modifier = Modifier.padding(0.dp, 0.dp, 0.dp, 4.dp)
@@ -188,8 +187,8 @@ private fun cardHeadline(test: String) {
 }
 
 @Composable
-private fun configuration(context: Any?) {
-    cardHeadline(ResString.configuration)
+private fun Configuration(context: Any?) {
+    CardHeadline(ResString.configuration)
 
     // API URL + reset button
     var apiBaseUrl by remember { mutableStateOf(Config.apiBaseUrl) }
@@ -356,8 +355,8 @@ private fun configuration(context: Any?) {
 }
 
 @Composable
-private fun gateway(context: Any?) {
-    cardHeadline(ResString.gateway)
+private fun Gateway(context: Any?) {
+    CardHeadline(ResString.gateway)
 
     Row {
         Button(onClick = { startGateway(context) }) {
@@ -373,7 +372,7 @@ private fun gateway(context: Any?) {
 }
 
 @Composable
-private fun messages(messages: String) {
+private fun Messages(messages: String) {
     SelectionContainer {
         Text(
             messages,
@@ -383,7 +382,7 @@ private fun messages(messages: String) {
 }
 
 @Composable
-fun addHeadlineWithLogo() {
+fun AddHeadlineWithLogo() {
     val annotatedString = buildAnnotatedString {
         appendInlineContent(id = "imageId")
         append("  " + tkhamez.discordRelay.lib.ResString.appName)
@@ -414,7 +413,7 @@ fun addHeadlineWithLogo() {
 
 @Suppress("unused")
 @Composable
-private fun debugButtons() {
+private fun DebugButtons() {
     val gateway = getGateway()
     Button(onClick = { messagesJob?.cancel() }) { Text("D Cancel messagesJob") }
     Button(onClick = { gateway.testCloseResumeOK() }) { Text("D close resume OK") }

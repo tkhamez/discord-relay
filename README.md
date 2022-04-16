@@ -107,3 +107,24 @@ apksigner sign --ks misc/key-store.jks android/build/discord-relay.apk
 - Base64 encode keystore: `base64 -w 0 misc/key-store.jks > misc/key-store.jks.base64.txt`.
 - Create an action secret `KEY_STORE` with that value.
 - Create an action secret `KEY_STORE_PASS` with the password for the key store.
+
+## Dev
+
+Needs OpenJDK 17 and Android SDK.
+
+Run server (uncomment "DebugButtons()" in App.kt to use it):
+```
+./gradlew server:run
+```
+
+Run Desktop app:
+```
+./gradlew desktop:run
+```
+
+Run console app:
+```
+./gradlew console:run
+```
+
+Use Android Studio to run the Android app.

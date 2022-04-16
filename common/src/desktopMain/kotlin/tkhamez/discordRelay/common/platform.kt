@@ -9,10 +9,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.painter.Painter
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
 import tkhamez.discordRelay.lib.Config
 import tkhamez.discordRelay.lib.getGateway
 import java.util.prefs.Preferences
@@ -26,7 +22,7 @@ private const val CONFIG_ONLY_MENTION_EVERYONE = "onlyMentionEveryone"
 private const val CONFIG_WEBHOOK = "webhook"
 
 actual fun getUserLanguage(context: Any?): String {
-    return System.getProperty("user.language")
+    return System.getProperty("user.language") ?: "en"
 }
 
 actual fun saveConfig(context: Any?, config: Config) {

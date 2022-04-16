@@ -27,6 +27,7 @@ private const val EVENT_READY = "READY"
 private const val EVENT_GUILD_CREATE = "GUILD_CREATE"
 private const val EVENT_RESUMED = "RESUMED"
 private const val EVENT_MESSAGE_CREATE = "MESSAGE_CREATE"
+//private const val EVENT_THREAD_CREATE = "THREAD_CREATE"
 
 private const val CLOSE_REASON_MESSAGE_PROTOCOL_ERROR = "Protocol error"
 private const val CLOSE_REASON_MESSAGE_NORMAL = "Normal"
@@ -39,6 +40,7 @@ private val httpClient = HttpClient(CIO) {
 /**
  * https://discord.com/developers/docs/topics/gateway
  * https://discord.com/developers/docs/topics/opcodes-and-status-codes
+ * https://discord.com/developers/docs/topics/threads
  */
 class Gateway {
     private val closeCodesReconnect = setOf<Short>(4000, 4001, 4002, 4003, 4005, 4007, 4008, 4009)
@@ -223,7 +225,9 @@ class Gateway {
                 clientClosed = false
                 identifySent = false
                 isClosed = false
-                httpClient.webSocket(url) {
+                val fullUrl = "$url?v=9"
+                log("WS url: $fullUrl")
+                httpClient.webSocket(fullUrl) {
                     log("WS connected")
                     webSocketSession = this
                     messagesSend(ResString.connected)
@@ -502,7 +506,7 @@ class Gateway {
             if (guild.channels != null) {
                 for (channel in guild.channels) {
                     if (Config.channelIds().contains(channel.id)) {
-                        Config.guildChannels.add(GuildObject(id = channel.id, name = channel.name, guild = tmpGuild))
+                        Config.guildChannels.add(GuildProperty(id = channel.id, name = channel.name, guild = tmpGuild))
                     }
                 }
             }
@@ -510,7 +514,7 @@ class Gateway {
             // Roles
             if (guild.roles != null) {
                 for (role in guild.roles) {
-                    Config.guildRoles.add(GuildObject(id = role.id, name = role.name, guild = tmpGuild))
+                    Config.guildRoles.add(GuildProperty(id = role.id, name = role.name, guild = tmpGuild))
                 }
             }
 

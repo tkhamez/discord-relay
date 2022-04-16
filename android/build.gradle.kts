@@ -1,5 +1,5 @@
 plugins {
-    id("org.jetbrains.compose") version "1.0.0"
+    id("org.jetbrains.compose") version "1.2.0"
     id("com.android.application")
     kotlin("android")
 }
@@ -11,7 +11,7 @@ repositories {
 dependencies {
     implementation(project(":lib"))
     implementation(project(":common"))
-    implementation("androidx.activity:activity-compose:1.4.0")
+    implementation("androidx.activity:activity-compose:1.6.1")
 }
 
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
@@ -19,11 +19,11 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
 }
 
 android {
-    compileSdk = 31
+    compileSdk = 33
     defaultConfig {
         applicationId = "tkhamez.discordRelay.android"
         minSdk = 21
-        targetSdk = 31
+        targetSdk = 33
         versionCode = 1
         versionName = "1.3.0"
     }
@@ -36,4 +36,5 @@ android {
             isMinifyEnabled = false
         }
     }
+    namespace = "tkhamez.discordRelay.android"
 }

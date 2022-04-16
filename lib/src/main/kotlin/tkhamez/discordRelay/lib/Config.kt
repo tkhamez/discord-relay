@@ -30,12 +30,12 @@ object Config {
     /**
      * Cache of channel IDs and names with guild.
      */
-    val guildChannels = mutableListOf<GuildObject>()
+    val guildChannels = mutableListOf<GuildProperty>()
 
     /**
      * Cache of role IDs and names with guild.
      */
-    val guildRoles = mutableListOf<GuildObject>()
+    val guildRoles = mutableListOf<GuildProperty>()
 
     /**
      * Make sure that the onlyMentionEveryone list has the same size as the channelIds list.

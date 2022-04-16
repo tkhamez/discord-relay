@@ -50,13 +50,15 @@ data class DiscordGuild(
     val id: String? = null,
     val name: String? = null,
     val unavailable: Boolean? = null,
-    val roles: List<GuildObject>? = null,
-    val channels: List<GuildObject>? = null,
+    val roles: List<GuildProperty>? = null,
+    val channels: List<GuildProperty>? = null,
+    val threads: List<GuildProperty>? = null,
 )
 
-data class GuildObject(
+data class GuildProperty(
     val id: String? = null,
     val name: String? = null,
+    val parent_id: String? = null, // for threads
     val guild: DiscordGuild? = null,
 )
 
