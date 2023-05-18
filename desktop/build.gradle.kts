@@ -36,7 +36,7 @@ compose.desktop {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             //targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Rpm)
             packageName = "DiscordRelay"
-            packageVersion = "1.3.0"
+            packageVersion = "1.3.1"
             macOS {
                 iconFile.set(project.file("src/jvmMain/resources/app-icon.icns"))
             }
