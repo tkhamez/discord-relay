@@ -3,8 +3,8 @@
 
 ### v1.3.1, 2023-05-18
 
-- Increase target API level to Android 13.
-- Update some dependencies. 
+- Increased target API level to Android 13.
+- Updated some dependencies. 
 - Fix: Added a queue for messages so that they always arrive in the correct order.
 - Fix: A maximum of 1 message is sent every 2 seconds to avoid being rate-limited.
 - Fix (Android): If the display has been rotated, the settings are no longer reset.
